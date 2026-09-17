@@ -2,24 +2,31 @@ import { useEffect, useState } from 'react';
 import api from '../api/axios';
 
 function Browse() {
-  const [users, setUsers] = useState([]);
-  const [error, setError] = useState('');
-  const [bookingForm, setBookingForm] = useState(null); // holds { providerId, skill } when a request form is open
-  const [proposedTime, setProposedTime] = useState('');
-  const [message, setMessage] = useState('');
+const [users, setUsers] = useState([]);
+const [error, setError] = useState('');
+const [loading, setLoading] = useState(true);
+const [bookingForm, setBookingForm] = useState(null);
+const [proposedTime, setProposedTime] = useState('');
+const [message, setMessage] = useState('');
 
   useEffect(() => {
     fetchUsers();
   }, []);
 
   const fetchUsers = async () => {
-    try {
-      const res = await api.get('/users');
-      setUsers(res.data);
-    } catch (err) {
-      setError('Failed to load users');
-    }
-  };
+  try {
+    setLoading(true);
+
+    const res = await api.get('/users');
+    setUsers(res.data);
+
+  } catch (err) {
+    setError('Unable to load users. Please try again.');
+
+  } finally {
+    setLoading(false);
+  }
+};
 
   const openBookingForm = (providerId, skill) => {
     setBookingForm({ providerId, skill });
@@ -45,12 +52,14 @@ function Browse() {
   return (
     <div style={{ maxWidth: 700, margin: '50px auto' }}>
       <h2>Browse Skills</h2>
+      {loading && <p>Loading users...</p>}
       {error && <p style={{ color: 'red' }}>{error}</p>}
       {message && <p>{message}</p>}
 
-      {users.length === 0 && <p>No other users yet. Register a second account to test this!</p>}
-
-      {users.map((u) => (
+      {!loading && users.length === 0 && (
+  <p>No other users yet. Register a second account to test this!</p>
+)}
+      {!loading && users.map((u) => (
         <div key={u._id} style={{ border: '1px solid #ccc', padding: 12, marginBottom: 10, borderRadius: 6 }}>
           <h4>{u.name}</h4>
           <p><strong>Offers:</strong> {u.skillsOffered?.length ? u.skillsOffered.join(', ') : 'Nothing listed yet'}</p>
