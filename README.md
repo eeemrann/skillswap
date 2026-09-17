@@ -7,18 +7,10 @@ Built as the capstone project for the **IBM Full-Stack JavaScript Developer Prof
 ## Live Demo
 
 - **Frontend:** https://skillswap.vercel.app
-- **Backend API:** https://skillswap-api.onrender.com
-- **Matching Service:** https://skillswap-matching.onrender.com
+- **Backend API:** https://skillswap-1-x54c.onrender.com
+- **Matching Service:** https://skillswap-vmma.onrender.com
 
 > Note: the backend and matching service run on Render's free tier, which spins down after inactivity. The first request after idle time may take 30–50 seconds to wake up.
-
-## Screenshots
-
-| Login | Browse Skills | Bookings |
-|---|---|---|
-| _add screenshot_ | _add screenshot_ | _add screenshot_ |
-
-**Demo GIF:** _add a short screen recording here of the full flow (register → edit skills → browse → book → accept → complete)_
 
 ## Features
 
@@ -183,4 +175,4 @@ Every push to `main` triggers a GitHub Actions workflow that installs dependenci
 
 ## Author
 
-Built by [Your Name] as a capstone project for the IBM Full-Stack JavaScript Developer Professional Certificate on Coursera.
+Built by Mahdi Hasan.
