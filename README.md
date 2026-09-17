@@ -2,11 +2,9 @@
 
 A peer-to-peer skill-bartering platform where users trade skills using **time credits** instead of money. Teach an hour of guitar, earn a credit. Spend a credit to learn an hour of Spanish. No cash changes hands.
 
-Built as the capstone project for the **IBM Full-Stack JavaScript Developer Professional Certificate**, covering full-stack development, a polyglot microservice, containerization, CI/CD, and cloud deployment.
-
 ## Live Demo
 
-- **Frontend:** https://skillswap.vercel.app
+- **Frontend:** https://skillswap-rho-five.vercel.app
 - **Backend API:** https://skillswap-1-x54c.onrender.com
 - **Matching Service:** https://skillswap-vmma.onrender.com
 
