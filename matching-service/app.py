@@ -14,12 +14,11 @@ def match():
     candidates = data.get('candidates', [])  # list of { id, name, skillsOffered }
 
     # Normalize to lowercase so "guitar" matches "Guitar"
-    wanted_set = set(s.lower().strip() for s in my_skills_wanted)
-
+    wanted_set = set(str(s).lower().strip() for s in my_skills_wanted if s)
     results = []
     for candidate in candidates:
         offered = candidate.get('skillsOffered', [])
-        offered_set = set(s.lower().strip() for s in offered)
+        offered_set = set(str(s).lower().strip() for s in offered if s)
 
         # Score = how many of the skills I want, this person offers
         overlap = wanted_set.intersection(offered_set)

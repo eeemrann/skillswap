@@ -14,12 +14,18 @@ exports.getProfile = async (req, res) => {
 // UPDATE the logged-in user's skills
 exports.updateSkills = async (req, res) => {
   try {
-    const { skillsOffered, skillsWanted } = req.body;
+    const sanitize = (arr) =>
+      Array.isArray(arr)
+        ? arr.filter((s) => typeof s === 'string' && s.trim().length > 0).map((s) => s.trim())
+        : [];
+
+    const skillsOffered = sanitize(req.body.skillsOffered);
+    const skillsWanted = sanitize(req.body.skillsWanted);
 
     const user = await User.findByIdAndUpdate(
       req.userId,
       { skillsOffered, skillsWanted },
-      { new: true } // return the updated document
+      { new: true }
     ).select('-password');
 
     res.json(user);
@@ -31,7 +37,9 @@ exports.updateSkills = async (req, res) => {
 // GET all other users (for browsing skills) — excludes the logged-in user and passwords
 exports.getAllUsers = async (req, res) => {
   try {
-    const users = await User.find({ _id: { $ne: req.userId } }).select('-password');
+    // Only expose what the Browse page actually needs
+    const users = await User.find({ _id: { $ne: req.userId } })
+      .select('name skillsOffered skillsWanted');
     res.json(users);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });

@@ -7,54 +7,33 @@ exports.createBooking = async (req, res) => {
   try {
     const { providerId, skill, proposedTime } = req.body;
 
-    // Prevent booking yourself
-    if (providerId === req.userId) {
-      return res.status(400).json({
-        message: 'You cannot book a session with yourself'
-      });
+    if (!mongoose.Types.ObjectId.isValid(providerId)) {
+      return res.status(400).json({ message: 'Invalid provider id' });
     }
 
-    // Check provider exists
+    // Compare as ObjectIds, not raw strings — avoids case-sensitivity bypass
+    if (new mongoose.Types.ObjectId(providerId).equals(req.userId)) {
+      return res.status(400).json({ message: 'You cannot book a session with yourself' });
+    }
+
     const provider = await User.findById(providerId);
-
     if (!provider) {
-      return res.status(404).json({
-        message: 'Provider not found'
-      });
+      return res.status(404).json({ message: 'Provider not found' });
     }
-
-    // Check provider actually offers the skill
     if (!provider.skillsOffered.includes(skill)) {
-      return res.status(400).json({
-        message: 'This provider does not offer that skill'
-      });
+      return res.status(400).json({ message: 'This provider does not offer that skill' });
     }
 
-    // Validate date
     const time = new Date(proposedTime);
-
     if (isNaN(time.getTime()) || time < new Date()) {
-      return res.status(400).json({
-        message: 'Proposed time must be a valid future date'
-      });
+      return res.status(400).json({ message: 'Proposed time must be a valid future date' });
     }
 
-    const booking = new Booking({
-      requester: req.userId,
-      provider: providerId,
-      skill,
-      proposedTime: time
-    });
-
+    const booking = new Booking({ requester: req.userId, provider: providerId, skill, proposedTime: time });
     await booking.save();
-
     res.status(201).json(booking);
-
   } catch (err) {
-    res.status(500).json({
-      message: 'Server error',
-      error: err.message
-    });
+    res.status(500).json({ message: 'Server error', error: err.message });
   }
 };
 
@@ -78,57 +57,40 @@ exports.getMyBookings = async (req, res) => {
 exports.updateBookingStatus = async (req, res) => {
   try {
     const { status } = req.body;
-
     const allowed = ['accepted', 'declined'];
-
     if (!allowed.includes(status)) {
-      return res.status(400).json({
-        message: 'Status must be accepted or declined'
-      });
+      return res.status(400).json({ message: 'Status must be accepted or declined' });
     }
 
-    const booking = await Booking.findById(req.params.id);
+    const existing = await Booking.findById(req.params.id);
+    if (!existing) return res.status(404).json({ message: 'Booking not found' });
+    if (existing.provider.toString() !== req.userId) {
+      return res.status(403).json({ message: 'Not authorized to update this booking' });
+    }
+
+    // Atomic: this only succeeds if status is STILL "pending" at the moment of writing,
+    // closing the gap between the read above and any concurrent request's write
+    const booking = await Booking.findOneAndUpdate(
+      { _id: req.params.id, status: 'pending' },
+      { status },
+      { new: true }
+    );
 
     if (!booking) {
-      return res.status(404).json({
-        message: 'Booking not found'
-      });
+      return res.status(400).json({ message: 'Only pending bookings can be accepted or declined' });
     }
-
-    // Only provider can accept/decline
-    if (booking.provider.toString() !== req.userId) {
-      return res.status(403).json({
-        message: 'Not authorized to update this booking'
-      });
-    }
-
-    // Only pending bookings can change
-    if (booking.status !== 'pending') {
-      return res.status(400).json({
-        message: 'Only pending bookings can be accepted or declined'
-      });
-    }
-
-    booking.status = status;
-
-    await booking.save();
 
     res.json(booking);
-
   } catch (err) {
-    res.status(500).json({
-      message: 'Server error',
-      error: err.message
-    });
+    res.status(500).json({ message: 'Server error', error: err.message });
   }
 };
 
 // COMPLETE a booking — transfers 1 credit from requester to provider
 exports.completeBooking = async (req, res) => {
   const session = await mongoose.startSession();
+  session.startTransaction();
   try {
-    session.startTransaction();
-
     const booking = await Booking.findById(req.params.id).session(session);
     if (!booking) {
       await session.abortTransaction();
@@ -145,8 +107,8 @@ exports.completeBooking = async (req, res) => {
 
     const requester = await User.findById(booking.requester).session(session);
     const provider = await User.findById(booking.provider).session(session);
-
     const CREDIT_COST = 1;
+
     if (requester.creditBalance < CREDIT_COST) {
       await session.abortTransaction();
       return res.status(400).json({ message: 'Insufficient credits to complete this booking' });
@@ -166,11 +128,11 @@ exports.completeBooking = async (req, res) => {
     await booking.save({ session });
 
     await session.commitTransaction();
-    session.endSession();
     res.json({ message: 'Booking completed, credits transferred', booking });
   } catch (err) {
     await session.abortTransaction();
-    session.endSession();
     res.status(500).json({ message: 'Server error', error: err.message });
+  } finally {
+    session.endSession(); // ALWAYS runs — fixes the leaked-session bug
   }
 };

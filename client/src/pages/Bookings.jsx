@@ -1,27 +1,24 @@
 import { useEffect, useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
-import { setCredentials } from '../redux/authSlice';
-import api from '../api/axios';
+import { useSelector } from 'react-redux';import api from '../api/axios';
 
 function Bookings() {
   const [bookings, setBookings] = useState([]);
   const [message, setMessage] = useState('');
   const currentUser = useSelector((state) => state.auth.user);
-  const token = useSelector((state) => state.auth.token);
-  const dispatch = useDispatch();
-
-  useEffect(() => {
-    fetchBookings();
-  }, []);
 
   const fetchBookings = async () => {
-    try {
-      const res = await api.get('/bookings');
-      setBookings(res.data);
-    } catch (err) {
-      setMessage('Failed to load bookings');
-    }
-  };
+  try {
+    const res = await api.get('/bookings');
+    setBookings(res.data);
+  } catch {
+  setMessage('Failed to load bookings');
+}
+};
+
+useEffect(() => {
+  fetchBookings();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
 
   const respondToBooking = async (id, status) => {
     try {

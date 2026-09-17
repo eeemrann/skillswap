@@ -24,7 +24,7 @@ jobs:
 
       - run: npm install
 
-      - run: node -e "require('./server.js')" || echo "Server syntax checked"
+      - run: npm test
 
 
   frontend-check:
@@ -43,4 +43,25 @@ jobs:
 
       - run: npm install
 
+      - run: npm run lint
+
       - run: npm run build
+
+
+  matching-service-check:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./matching-service
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: pip install -r requirements.txt
+
+      - run: python -c "import app"

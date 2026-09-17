@@ -2,6 +2,8 @@ import { createSlice } from '@reduxjs/toolkit';
 
 const storedUser = localStorage.getItem('user');
 
+const normalize = (user) => ({ ...user, id: user.id || user._id });
+
 const authSlice = createSlice({
   name: 'auth',
   initialState: {
@@ -10,10 +12,16 @@ const authSlice = createSlice({
   },
   reducers: {
     setCredentials: (state, action) => {
-      state.user = action.payload.user;
+      const user = normalize(action.payload.user);
+      state.user = user;
       state.token = action.payload.token;
       localStorage.setItem('token', action.payload.token);
-      localStorage.setItem('user', JSON.stringify(action.payload.user));
+      localStorage.setItem('user', JSON.stringify(user));
+    },
+    updateUser: (state, action) => {
+      const user = normalize(action.payload);
+      state.user = user;
+      localStorage.setItem('user', JSON.stringify(user));
     },
     logout: (state) => {
       state.user = null;
@@ -24,5 +32,5 @@ const authSlice = createSlice({
   }
 });
 
-export const { setCredentials, logout } = authSlice.actions;
+export const { setCredentials, updateUser, logout } = authSlice.actions;
 export default authSlice.reducer;

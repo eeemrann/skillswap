@@ -9,24 +9,26 @@ const [bookingForm, setBookingForm] = useState(null);
 const [proposedTime, setProposedTime] = useState('');
 const [message, setMessage] = useState('');
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const fetchUsers = async () => {
+ const fetchUsers = async () => {
   try {
     setLoading(true);
 
     const res = await api.get('/users');
+
     setUsers(res.data);
 
-  } catch (err) {
-    setError('Unable to load users. Please try again.');
-
-  } finally {
+  } catch {
+  setError('Failed to load users');
+} finally {
     setLoading(false);
   }
 };
+
+
+useEffect(() => {
+  fetchUsers();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
 
   const openBookingForm = (providerId, skill) => {
     setBookingForm({ providerId, skill });
@@ -39,7 +41,7 @@ const [message, setMessage] = useState('');
       await api.post('/bookings', {
         providerId: bookingForm.providerId,
         skill: bookingForm.skill,
-        proposedTime
+        proposedTime: new Date(proposedTime).toISOString()
       });
       setMessage('Request sent!');
       setBookingForm(null);

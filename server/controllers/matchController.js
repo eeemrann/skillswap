@@ -15,9 +15,9 @@ exports.getMatches = async (req, res) => {
     const matchingServiceUrl = process.env.MATCHING_SERVICE_URL || 'http://localhost:6000';
 
     const response = await axios.post(`${matchingServiceUrl}/match`, {
-      mySkillsWanted: me.skillsWanted,
-      candidates
-    });
+  mySkillsWanted: me.skillsWanted,
+  candidates
+}, { timeout: 5000 });
 
     res.json(response.data);
   } catch (err) {

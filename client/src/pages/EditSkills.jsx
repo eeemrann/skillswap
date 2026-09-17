@@ -8,20 +8,28 @@ function EditSkills() {
   const [message, setMessage] = useState('');
   const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchProfile();
-  }, []);
+ const fetchProfile = async () => {
+  try {
+    const res = await api.get('/users/me');
 
-  const fetchProfile = async () => {
-    try {
-      const res = await api.get('/users/me');
-      // Convert arrays back to comma-separated text for the input fields
-      setSkillsOffered((res.data.skillsOffered || []).join(', '));
-      setSkillsWanted((res.data.skillsWanted || []).join(', '));
-    } catch (err) {
-      setMessage('Failed to load profile');
-    }
-  };
+    setSkillsOffered(
+      (res.data.skillsOffered || []).join(', ')
+    );
+
+    setSkillsWanted(
+      (res.data.skillsWanted || []).join(', ')
+    );
+
+  } catch {
+  setMessage('Failed to load profile');
+}
+};
+
+
+useEffect(() => {
+  fetchProfile();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
