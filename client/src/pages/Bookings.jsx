@@ -51,9 +51,8 @@ function Bookings() {
 
       {bookings.map((b) => {
         // Figure out if the logged-in user is the requester or the provider for this booking
-        const isProvider = b.provider._id === currentUser?._id;
-        const isRequester = b.requester._id === currentUser?._id;
-
+        const isProvider = b.provider?._id === currentUser?.id;
+        const isRequester = b.requester?._id === currentUser?.id;
         return (
           <div key={b._id} style={{ border: '1px solid #ccc', padding: 12, marginBottom: 10, borderRadius: 6 }}>
             <p><strong>Skill:</strong> {b.skill}</p>
