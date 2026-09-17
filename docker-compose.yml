@@ -1,12 +1,22 @@
 version: '3.8'
 
 services:
+  matching-service:
+    build: ./matching-service
+    ports:
+      - "6000:6000"
+    restart: unless-stopped
+
   server:
     build: ./server
     ports:
       - "5000:5000"
     env_file:
       - ./server/.env
+    environment:
+      - MATCHING_SERVICE_URL=http://matching-service:6000
+    depends_on:
+      - matching-service
     restart: unless-stopped
 
   client:

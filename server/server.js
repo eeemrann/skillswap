@@ -20,6 +20,9 @@ app.use('/api/bookings', bookingRoutes);
 const creditRoutes = require('./routes/creditRoutes');
 app.use('/api/credits', creditRoutes);
 
+const matchRoutes = require('./routes/matchRoutes');
+app.use('/api/matches', matchRoutes);
+
 app.get('/', (req, res) => {
   res.send('SkillSwap API is running!');
 });
