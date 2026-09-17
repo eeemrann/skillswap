@@ -11,6 +11,15 @@ app.use(express.json());
 const authRoutes = require('./routes/authRoutes');
 app.use('/api/auth', authRoutes);
 
+const userRoutes = require('./routes/userRoutes');
+app.use('/api/users', userRoutes);
+
+const bookingRoutes = require('./routes/bookingRoutes');
+app.use('/api/bookings', bookingRoutes);
+
+const creditRoutes = require('./routes/creditRoutes');
+app.use('/api/credits', creditRoutes);
+
 app.get('/', (req, res) => {
   res.send('SkillSwap API is running!');
 });
