@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { logout, setCredentials, updateUser } from '../redux/authSlice';
+import { logout, setCredentials } from '../redux/authSlice';
 import { Link } from 'react-router-dom';
 import api from '../api/axios';
 

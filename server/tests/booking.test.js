@@ -1,18 +1,30 @@
 const request = require('supertest');
-const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const app = require('../app'); // now testable without starting a real server
+const mongoose = require('mongoose');
+const app = require('../app');
+
+process.env.JWT_SECRET = 'test-secret';
+
+jest.setTimeout(120000);
 
 let mongoServer;
 
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
+  mongoServer = await MongoMemoryServer.create({
+    binary: {
+      version: '7.0.14'
+    }
+  });
+
   await mongoose.connect(mongoServer.getUri());
 });
 
 afterAll(async () => {
   await mongoose.disconnect();
-  await mongoServer.stop();
+
+  if (mongoServer) {
+    await mongoServer.stop();
+  }
 });
 
 describe('Auth + Booking behavior', () => {
