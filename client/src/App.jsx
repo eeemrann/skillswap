@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Browse from './pages/Browse';
 import EditSkills from './pages/EditSkills';
 import Bookings from './pages/Bookings';
+import Landing from './pages/Landing';
 
 function App() {
   const token = useSelector((state) => state.auth.token);
@@ -13,6 +14,7 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route
