@@ -4,7 +4,7 @@ A peer-to-peer skill-bartering platform where users trade skills using **time cr
 
 ## Live Demo
 
-- **Frontend:** https://skillswap.vercel.app
+- **Frontend:** https://skillswap-rho-five.vercel.app
 - **Backend API:** https://skillswap-1-x54c.onrender.com
 - **Matching Service:** https://skillswap-vmma.onrender.com
 
