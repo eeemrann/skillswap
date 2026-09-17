@@ -27,3 +27,13 @@ exports.updateSkills = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 };
+
+// GET all other users (for browsing skills) — excludes the logged-in user and passwords
+exports.getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find({ _id: { $ne: req.userId } }).select('-password');
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};

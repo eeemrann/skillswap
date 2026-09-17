@@ -19,8 +19,21 @@ function Login() {
     setError('');
     try {
       const res = await api.post('/auth/login', form);
-      dispatch(setCredentials(res.data)); // saves token + user to Redux + localStorage
-      navigate('/dashboard');
+
+const token = res.data.token;
+
+// temporarily store token so /me can use it
+localStorage.setItem('token', token);
+
+// get complete user profile
+const userRes = await api.get('/users/me');
+
+dispatch(setCredentials({
+  user: userRes.data,
+  token
+}));
+
+navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed');
     }
