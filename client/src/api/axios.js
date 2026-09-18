@@ -1,7 +1,16 @@
 import axios from 'axios';
 
+const localApiUrl = 'http://localhost:5000/api';
+const productionApiUrl = 'https://skillswap-1-x54c.onrender.com/api';
+
+// Vercel builds do not have access to the developer's localhost. Keep local
+// development convenient while making an existing production build usable.
+const configuredApiUrl = import.meta.env.VITE_API_URL;
+const isLocalHost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+const apiBaseUrl = configuredApiUrl || (isLocalHost ? localApiUrl : productionApiUrl);
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+  baseURL: apiBaseUrl
 });
 
 api.interceptors.request.use((config) => {
