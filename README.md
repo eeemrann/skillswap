@@ -227,20 +227,6 @@ PORT=7000
 VITE_API_URL=http://localhost:5000/api
 ```
 
-### Running with Docker Compose
-
-```bash
-docker compose up --build
-```
-
-This starts all services together:
-- **Frontend:** http://localhost:8080
-- **Backend API:** http://localhost:5000
-- **Matching Service:** http://localhost:6000
-- **Notification Service:** http://localhost:7000
-- **MongoDB:** localhost:27017
-
----
 
 ## 📡 API Endpoints
 
