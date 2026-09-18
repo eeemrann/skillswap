@@ -7,6 +7,9 @@ import Browse from './pages/Browse';
 import EditSkills from './pages/EditSkills';
 import Bookings from './pages/Bookings';
 import Landing from './pages/Landing';
+import CreditHistory from './pages/CreditHistory';
+import Messages from './pages/Messages';
+import AdminDashboard from './pages/AdminDashboard';
 
 function App() {
   const token = useSelector((state) => state.auth.token);
@@ -33,6 +36,9 @@ function App() {
           path="/browse"
           element={token ? <Browse /> : <Navigate to="/login" />}
         />
+        <Route path="/credits" element={token ? <CreditHistory /> : <Navigate to="/login" />} />
+        <Route path="/messages" element={token ? <Messages /> : <Navigate to="/login" />} />
+        <Route path="/admin" element={token ? <AdminDashboard /> : <Navigate to="/login" />} />
         <Route path="*" element={<Navigate to={token ? '/dashboard' : '/login'} />} />
       </Routes>
     </BrowserRouter>

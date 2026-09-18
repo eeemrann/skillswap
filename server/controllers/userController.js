@@ -34,12 +34,40 @@ exports.updateSkills = async (req, res) => {
   }
 };
 
+exports.updateProfile = async (req, res) => {
+  try {
+    const { bio, timezone, location, availability } = req.body;
+    const cleanAvailability = Array.isArray(availability)
+      ? availability.filter((slot) => slot && slot.day && slot.start && slot.end)
+      : [];
+
+    const user = await User.findByIdAndUpdate(
+      req.userId,
+      {
+        bio: typeof bio === 'string' ? bio.trim() : '',
+        timezone: typeof timezone === 'string' ? timezone.trim() : 'UTC',
+        location: {
+          city: typeof location?.city === 'string' ? location.city.trim() : '',
+          country: typeof location?.country === 'string' ? location.country.trim() : '',
+          coordinates: location?.coordinates
+        },
+        availability: cleanAvailability
+      },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    res.json(user);
+  } catch (err) {
+    res.status(400).json({ message: err.message || 'Profile update failed' });
+  }
+};
+
 // GET all other users (for browsing skills) — excludes the logged-in user and passwords
 exports.getAllUsers = async (req, res) => {
   try {
     // Only expose what the Browse page actually needs
-    const users = await User.find({ _id: { $ne: req.userId } })
-      .select('name skillsOffered skillsWanted');
+    const users = await User.find({ _id: { $ne: req.userId }, status: { $ne: 'suspended' } })
+      .select('name bio skillsOffered skillsWanted location timezone availability');
     res.json(users);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });

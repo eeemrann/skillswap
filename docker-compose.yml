@@ -7,6 +7,18 @@ services:
       - "6000:6000"
     restart: unless-stopped
 
+  notification-service:
+    build: ./notification-service
+    ports:
+      - "7000:7000"
+    environment:
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - EMAIL_FROM=${EMAIL_FROM}
+    restart: unless-stopped
+
   server:
     build: ./server
     ports:
@@ -15,8 +27,10 @@ services:
       - ./server/.env
     environment:
       - MATCHING_SERVICE_URL=http://matching-service:6000
+      - NOTIFICATION_SERVICE_URL=http://notification-service:7000
     depends_on:
       - matching-service
+      - notification-service
     restart: unless-stopped
 
   client:

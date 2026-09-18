@@ -24,6 +24,9 @@ function AppShell({ children, eyebrow, title, description, action }) {
           <NavLink to="/browse" className="app-nav-link"><span>⌕</span> Discover skills</NavLink>
           <NavLink to="/bookings" className="app-nav-link"><span>◷</span> My bookings</NavLink>
           <NavLink to="/edit-skills" className="app-nav-link"><span>✦</span> My skill profile</NavLink>
+          <NavLink to="/credits" className="app-nav-link"><span>◈</span> Credit history</NavLink>
+          <NavLink to="/messages" className="app-nav-link"><span>✉</span> Messages</NavLink>
+          <NavLink to="/admin" className="app-nav-link"><span>⚙</span> Admin</NavLink>
         </nav>
         <div className="sidebar-bottom">
           <div className="sidebar-note">

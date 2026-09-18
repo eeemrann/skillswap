@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Booking = require('../models/Booking');
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
+const { notify } = require('../services/notificationService');
 // CREATE a booking request
 exports.createBooking = async (req, res) => {
   try {
@@ -31,6 +32,8 @@ exports.createBooking = async (req, res) => {
 
     const booking = new Booking({ requester: req.userId, provider: providerId, skill, proposedTime: time });
     await booking.save();
+    const requester = await User.findById(req.userId).select('name email');
+    notify('BOOKING_CREATED', provider.email, { actor: requester?.name || 'A SkillSwap member', skill, time: time.toLocaleString() });
     res.status(201).json(booking);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
@@ -80,6 +83,11 @@ exports.updateBookingStatus = async (req, res) => {
       return res.status(400).json({ message: 'Only pending bookings can be accepted or declined' });
     }
 
+    const requester = await User.findById(booking.requester).select('name email');
+    const provider = await User.findById(booking.provider).select('name email');
+    notify(status === 'accepted' ? 'BOOKING_ACCEPTED' : 'BOOKING_DECLINED', requester.email, {
+      actor: provider.name, skill: booking.skill, time: new Date(booking.proposedTime).toLocaleString()
+    });
     res.json(booking);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
@@ -128,6 +136,7 @@ exports.completeBooking = async (req, res) => {
     await booking.save({ session });
 
     await session.commitTransaction();
+    notify('BOOKING_COMPLETED', provider.email, { actor: requester.name, skill: booking.skill });
     res.json({ message: 'Booking completed, credits transferred', booking });
   } catch (err) {
     await session.abortTransaction();

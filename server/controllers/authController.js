@@ -48,10 +48,17 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: 'Invalid email or password' });
     }
 
-    // Create a JWT token containing the user's id
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    if (user.status === 'suspended') {
+      return res.status(403).json({ message: 'This account has been suspended' });
+    }
 
-    res.json({ token, user: { id: user._id, name: user.name, email: user.email } });
+    const token = jwt.sign(
+      { userId: user._id, role: user.role || 'user' },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role || 'user' } });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
