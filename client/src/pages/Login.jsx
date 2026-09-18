@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import api from '../api/axios';
 import { setCredentials } from '../redux/authSlice';
+import AuthLayout from '../components/AuthLayout';
 
 function Login() {
   const [form, setForm] = useState({ email: '', password: '' });
@@ -10,48 +11,30 @@ function Login() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setError('');
     try {
       const res = await api.post('/auth/login', form);
-
-const token = res.data.token;
-
-// temporarily store token so /me can use it
-localStorage.setItem('token', token);
-
-// get complete user profile
-const userRes = await api.get('/users/me');
-
-dispatch(setCredentials({
-  user: userRes.data,
-  token
-}));
-
-navigate('/dashboard');
+      const token = res.data.token;
+      localStorage.setItem('token', token);
+      const userRes = await api.get('/users/me');
+      dispatch(setCredentials({ user: userRes.data, token }));
+      navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed');
     }
   };
 
   return (
-    <div style={{ maxWidth: 400, margin: '50px auto' }}>
-      <h2>Login</h2>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      <form onSubmit={handleSubmit}>
-        <input name="email" type="email" placeholder="Email" value={form.email} onChange={handleChange} required />
-        <br /><br />
-        <input name="password" type="password" placeholder="Password" value={form.password} onChange={handleChange} required />
-        <br /><br />
-        <button type="submit">Login</button>
+    <AuthLayout mode="login">
+      {error && <p className="auth-error">{error}</p>}
+      <form className="auth-form" onSubmit={handleSubmit}>
+        <div className="form-field"><label htmlFor="email">Email address</label><input id="email" name="email" type="email" placeholder="you@example.com" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} required /></div>
+        <div className="form-field"><label htmlFor="password">Password</label><input id="password" name="password" type="password" placeholder="Enter your password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} required /></div>
+        <button className="primary-button" type="submit">Continue to your workspace <span>→</span></button>
       </form>
-      <p>No account? <Link to="/register">Register</Link></p>
-    </div>
+    </AuthLayout>
   );
 }
 
