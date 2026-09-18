@@ -1,9 +1,10 @@
 import { NavLink, Link, useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../redux/authSlice';
 
 function AppShell({ children, eyebrow, title, description, action }) {
   const dispatch = useDispatch();
+  const user = useSelector((state) => state.auth.user);
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -26,7 +27,7 @@ function AppShell({ children, eyebrow, title, description, action }) {
           <NavLink to="/edit-skills" className="app-nav-link"><span>✦</span> My skill profile</NavLink>
           <NavLink to="/credits" className="app-nav-link"><span>◈</span> Credit history</NavLink>
           <NavLink to="/messages" className="app-nav-link"><span>✉</span> Messages</NavLink>
-          <NavLink to="/admin" className="app-nav-link"><span>⚙</span> Admin</NavLink>
+          {user?.role === 'admin' && <NavLink to="/admin" className="app-nav-link"><span>⚙</span> Admin</NavLink>}
         </nav>
         <div className="sidebar-bottom">
           <div className="sidebar-note">

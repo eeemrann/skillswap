@@ -13,6 +13,8 @@ import AdminDashboard from './pages/AdminDashboard';
 
 function App() {
   const token = useSelector((state) => state.auth.token);
+  const user = useSelector((state) => state.auth.user);
+  const isAdmin = user?.role === 'admin';
 
   return (
     <BrowserRouter>
@@ -38,7 +40,7 @@ function App() {
         />
         <Route path="/credits" element={token ? <CreditHistory /> : <Navigate to="/login" />} />
         <Route path="/messages" element={token ? <Messages /> : <Navigate to="/login" />} />
-        <Route path="/admin" element={token ? <AdminDashboard /> : <Navigate to="/login" />} />
+        <Route path="/admin" element={token && isAdmin ? <AdminDashboard /> : <Navigate to={token ? '/dashboard' : '/login'} />} />
         <Route path="*" element={<Navigate to={token ? '/dashboard' : '/login'} />} />
       </Routes>
     </BrowserRouter>

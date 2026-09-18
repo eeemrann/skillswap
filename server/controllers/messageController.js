@@ -14,6 +14,7 @@ async function areConnected(userId, otherUserId) {
 
 exports.getMessages = async (req, res) => {
   if (!mongoose.Types.ObjectId.isValid(req.params.userId)) return res.status(400).json({ message: 'Invalid user id' });
+  if (req.params.userId === req.userId) return res.status(400).json({ message: 'Cannot open a conversation with yourself' });
   if (!(await areConnected(req.userId, req.params.userId))) return res.status(403).json({ message: 'Messaging is available after an accepted booking' });
   await Message.updateMany({ sender: req.params.userId, recipient: req.userId, readAt: null }, { readAt: new Date() });
   const messages = await Message.find({ $or: [{ sender: req.userId, recipient: req.params.userId }, { sender: req.params.userId, recipient: req.userId }] }).sort({ createdAt: 1 });
@@ -22,6 +23,9 @@ exports.getMessages = async (req, res) => {
 
 exports.sendMessage = async (req, res) => {
   const { body, bookingId } = req.body;
+  if (!mongoose.Types.ObjectId.isValid(req.params.userId)) return res.status(400).json({ message: 'Invalid user id' });
+  if (req.params.userId === req.userId) return res.status(400).json({ message: 'Cannot message yourself' });
+  if (bookingId && !mongoose.Types.ObjectId.isValid(bookingId)) return res.status(400).json({ message: 'Invalid booking id' });
   if (!body || !body.trim()) return res.status(400).json({ message: 'Message cannot be empty' });
   if (!(await areConnected(req.userId, req.params.userId))) return res.status(403).json({ message: 'Messaging is available after an accepted booking' });
   const message = await Message.create({ sender: req.userId, recipient: req.params.userId, booking: bookingId, body: body.trim() });
