@@ -113,22 +113,6 @@ npm install
 npm run dev
 ```
 
-### Environment Variables
-
-`server/.env`
-```
-MONGO_URI=your_mongodb_connection_string
-JWT_SECRET=your_secret_key
-PORT=5000
-MATCHING_SERVICE_URL=http://localhost:6000
-MATCHING_SERVICE_TIMEOUT_MS=60000
-```
-
-`client/.env` (create this locally from `client/.env.example`)
-```
-VITE_API_URL=http://localhost:5000/api
-```
-
 ## Running with Docker
 
 ```bash
