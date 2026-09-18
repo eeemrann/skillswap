@@ -121,9 +121,10 @@ MONGO_URI=your_mongodb_connection_string
 JWT_SECRET=your_secret_key
 PORT=5000
 MATCHING_SERVICE_URL=http://localhost:6000
+MATCHING_SERVICE_TIMEOUT_MS=60000
 ```
 
-`client/.env`
+`client/.env` (create this locally from `client/.env.example`)
 ```
 VITE_API_URL=http://localhost:5000/api
 ```
@@ -135,6 +136,8 @@ docker compose up --build
 ```
 
 This starts all three services together. The app will be available at `http://localhost:8080` (frontend), with the backend on `5000` and the matching service on `6000`.
+
+`docker-compose.yml` also provisions a local MongoDB container and uses safe development defaults for `MONGO_URI` and `JWT_SECRET`. Override them via environment variables when needed.
 
 ## API Overview
 

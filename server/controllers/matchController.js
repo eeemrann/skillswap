@@ -17,15 +17,20 @@ exports.getMatches = async (req, res) => {
 
     const matchingServiceUrl = process.env.MATCHING_SERVICE_URL || 'http://localhost:6000';
 
+    const matchingServiceTimeoutMs = Number(process.env.MATCHING_SERVICE_TIMEOUT_MS || 60000);
+
     const response = await axios.post(`${matchingServiceUrl}/match`, {
-  mySkillsWanted: me.skillsWanted,
-  myLocation: me.location,
-  myAvailability: me.availability,
-  candidates
-}, { timeout: 5000 });
+      mySkillsWanted: me.skillsWanted,
+      myLocation: me.location,
+      myAvailability: me.availability,
+      candidates
+    }, { timeout: matchingServiceTimeoutMs });
 
     res.json(response.data);
   } catch (err) {
+    if (err.code === 'ECONNABORTED') {
+      return res.status(504).json({ message: 'Matching service timed out. Please try again shortly.' });
+    }
     res.status(500).json({ message: 'Matching service error', error: err.message });
   }
 };
