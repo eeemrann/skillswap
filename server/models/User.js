@@ -3,6 +3,11 @@ const mongoose = require('mongoose');
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
+  // No default keeps accounts created before email verification backward-compatible.
+  // New local and Google registrations set this explicitly.
+  emailVerified: { type: Boolean },
+  emailVerificationCodeHash: { type: String, select: false },
+  emailVerificationExpires: { type: Date, select: false },
   password: { type: String, required: function () { return this.authProvider !== 'google'; } }, // hashed; optional for Google-only accounts
   authProvider: { type: String, enum: ['local', 'google'], default: 'local' },
   googleId: { type: String, unique: true, sparse: true },

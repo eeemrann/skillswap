@@ -3,10 +3,14 @@ import smtplib
 import ssl
 from email.message import EmailMessage
 from flask import Flask, jsonify, request
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 
 TEMPLATES = {
+    'EMAIL_VERIFICATION': ('Verify your SkillSwap email', 'Hi {actor},\n\nYour SkillSwap verification code is {code}. It expires in {minutes} minutes.\n\nIf you did not create this account, you can ignore this email.'),
     'BOOKING_CREATED': ('New SkillSwap request', '{actor} requested a {skill} exchange for {time}.'),
     'BOOKING_ACCEPTED': ('Your SkillSwap request was accepted', '{actor} accepted your {skill} exchange for {time}.'),
     'BOOKING_DECLINED': ('Your SkillSwap request was declined', '{actor} declined your {skill} exchange request.'),
