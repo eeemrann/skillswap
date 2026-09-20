@@ -206,6 +206,7 @@ The frontend will run on `http://localhost:5173` (Vite default).
 ```env
 MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/skillswap
 JWT_SECRET=your_jwt_secret_key_here_change_in_production
+GOOGLE_CLIENT_ID=your_google_oauth_web_client_id.apps.googleusercontent.com
 PORT=5000
 MATCHING_SERVICE_URL=http://localhost:6000
 NOTIFICATION_SERVICE_URL=http://localhost:7000
@@ -225,6 +226,7 @@ PORT=7000
 **`client/.env.local` (create locally)**
 ```env
 VITE_API_URL=http://localhost:5000/api
+VITE_GOOGLE_CLIENT_ID=your_google_oauth_web_client_id.apps.googleusercontent.com
 ```
 
 
@@ -235,6 +237,7 @@ VITE_API_URL=http://localhost:5000/api
 |---|---|---|
 | `POST` | `/api/auth/register` | Create a new user account |
 | `POST` | `/api/auth/login` | Authenticate and receive JWT token |
+| `POST` | `/api/auth/google` | Sign in or register with a Google ID token |
 
 ### Users & Skills
 | Method | Endpoint | Description |

@@ -3,7 +3,10 @@ const mongoose = require('mongoose');
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
-  password: { type: String, required: true }, // will store the HASHED password, never plain text
+  password: { type: String, required: function () { return this.authProvider !== 'google'; } }, // hashed; optional for Google-only accounts
+  authProvider: { type: String, enum: ['local', 'google'], default: 'local' },
+  googleId: { type: String, unique: true, sparse: true },
+  profilePicture: { type: String, default: '' },
   role: { type: String, enum: ['user', 'admin'], default: 'user' },
   status: { type: String, enum: ['active', 'suspended'], default: 'active' },
   bio: { type: String, maxlength: 500, default: '' },

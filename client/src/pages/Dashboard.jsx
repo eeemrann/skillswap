@@ -14,7 +14,6 @@ function Dashboard() {
   const dispatch = useDispatch();
   const [matches, setMatches] = useState([]);
   const [bookings, setBookings] = useState([]);
-  const [matchError, setMatchError] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -23,8 +22,7 @@ function Dashboard() {
     api.get('/users/me').then((res) => { if (active) dispatch(setCredentials({ user: res.data, token })); }).catch(() => {});
     Promise.allSettled([api.get('/matches'), api.get('/bookings')]).then(([matchResult, bookingResult]) => {
       if (!active) return;
-      if (matchResult.status === 'fulfilled') setMatches(matchResult.value.data);
-      else setMatchError('Recommendations are temporarily unavailable.');
+      setMatches(matchResult.status === 'fulfilled' ? matchResult.value.data : []);
       if (bookingResult.status === 'fulfilled') setBookings(bookingResult.value.data);
       setLoading(false);
     });
@@ -45,9 +43,9 @@ function Dashboard() {
         <div className="content-grid two-column">
           <section className="surface surface-pad">
             <div className="section-heading"><div><p className="section-kicker">Recommended for you</p><h2>People worth meeting</h2></div><Link to="/browse">View all <Icon name="arrow" size={14}/></Link></div>
-            {matchError && <p className="status-message error">{matchError}</p>}
-            {!matchError && !loading && matches.length === 0 && <div className="empty-state"><strong>Complete your skill profile</strong>Add what you can teach and want to learn to unlock tailored matches.</div>}
-            <div className="match-list">{matches.slice(0, 4).map((match) => <article className="match-card" key={match.id || match._id}><div className="match-person"><span className="avatar avatar-small">{initials(match.name)}</span><div><h3>{match.name}</h3><p>{match.matchedSkills?.join(' · ') || 'A promising skill overlap'}</p></div></div><span className="match-score">{match.score || 'New'} match</span></article>)}</div>
+            {loading && <div className="recommendation-loading" aria-label="Loading recommendations">{[1, 2, 3].map((item) => <div className="recommendation-skeleton" key={item}><span /><div><i /><i /></div></div>)}</div>}
+            {!loading && matches.length === 0 && <div className="recommendation-empty"><span className="recommendation-spark" aria-hidden="true">✨</span><h3>No recommendations yet</h3><p>Complete your profile by adding:</p><ul><li>Skills you want to learn</li><li>Skills you can teach</li></ul><p>We&apos;ll find skill exchange partners for you.</p><Link className="primary-button" to="/edit-skills">Complete Profile <Icon name="arrow" size={15}/></Link></div>}
+            {!loading && <div className="match-list">{matches.slice(0, 4).map((match) => <article className="match-card" key={match.id || match._id}><div className="match-person"><span className="avatar avatar-small">{initials(match.name)}</span><div><h3>{match.name}</h3><p>{match.matchedSkills?.join(' · ') || 'A promising skill overlap'}</p></div></div><span className="match-score">{match.score || 'New'} match</span></article>)}</div>}
           </section>
           <aside className="surface surface-pad profile-card"><p className="section-kicker">Your profile</p><span className="profile-avatar">{initials(user?.name)}</span><h2>{user?.name || 'Your profile'}</h2><p>{user?.skillsOffered?.length ? `${user.skillsOffered.length} skills ready to share with the community.` : 'Add your strengths so the right learners can find you.'}</p><div className="credit-balance"><small>Time credit balance</small><strong>{user?.creditBalance ?? 0} <span>credits</span></strong></div><Link className="secondary-button" to="/edit-skills">Improve profile <Icon name="arrow" size={15}/></Link></aside>
         </div>

@@ -18,12 +18,13 @@ describe('matchController.getMatches', () => {
     delete process.env.MATCHING_SERVICE_TIMEOUT_MS;
   });
 
-  test('returns 504 when matching service times out', async () => {
+  test('falls back to local matching when matching service times out', async () => {
     const req = { userId: 'my-user-id' };
     const res = mockResponse();
 
     User.findById.mockResolvedValue({
       skillsWanted: ['Spanish'],
+      skillsOffered: ['Photography'],
       location: { city: 'Dhaka' },
       availability: []
     });
@@ -31,7 +32,7 @@ describe('matchController.getMatches', () => {
     User.find.mockReturnValue({
       select: jest.fn().mockResolvedValue([
         {
-          _id: 'candidate-id',
+          _id: { toString: () => 'candidate-id' },
           name: 'Alex',
           skillsOffered: ['Spanish'],
           location: { city: 'Dhaka' },
@@ -44,7 +45,9 @@ describe('matchController.getMatches', () => {
 
     await getMatches(req, res);
 
-    expect(res.status).toHaveBeenCalledWith(504);
-    expect(res.json).toHaveBeenCalledWith({ message: 'Matching service timed out. Please try again shortly.' });
+    expect(res.status).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'candidate-id', name: 'Alex', matchedSkills: ['spanish'], score: 1.25 })
+    ]);
   });
 });
