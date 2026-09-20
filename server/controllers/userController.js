@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
 
 // GET the logged-in user's own profile
@@ -65,9 +66,32 @@ exports.updateProfile = async (req, res) => {
 // GET all other users (for browsing skills) — excludes the logged-in user and passwords
 exports.getAllUsers = async (req, res) => {
   try {
-    // Only expose what the Browse page actually needs
-    const users = await User.find({ _id: { $ne: req.userId }, status: { $ne: 'suspended' } })
-      .select('name bio skillsOffered skillsWanted location timezone availability');
+    const users = await User.aggregate([
+      { $match: { _id: { $ne: new mongoose.Types.ObjectId(req.userId) }, status: { $ne: 'suspended' } } },
+      {
+        $lookup: {
+          from: 'reviews',           // Mongoose auto-pluralizes the 'Review' model to this collection name
+          localField: '_id',
+          foreignField: 'reviewee',
+          as: 'reviews'
+        }
+      },
+      {
+        $addFields: {
+          averageRating: {
+            $cond: [{ $gt: [{ $size: '$reviews' }, 0] }, { $round: [{ $avg: '$reviews.rating' }, 1] }, 0]
+          },
+          reviewCount: { $size: '$reviews' }
+        }
+      },
+      {
+        $project: {
+          name: 1, bio: 1, skillsOffered: 1, skillsWanted: 1,
+          location: 1, timezone: 1, availability: 1,
+          averageRating: 1, reviewCount: 1
+        }
+      }
+    ]);
     res.json(users);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });

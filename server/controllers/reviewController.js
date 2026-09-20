@@ -27,3 +27,12 @@ exports.getUserReviews = async (req, res) => {
     .sort({ createdAt: -1 });
   res.json(reviews);
 };
+
+exports.getMyReviewedBookings = async (req, res) => {
+  try {
+    const reviews = await Review.find({ reviewer: req.userId }).select('booking');
+    res.json(reviews.map(r => r.booking.toString()));
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
