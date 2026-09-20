@@ -44,7 +44,7 @@ flowchart TB
     end
     subgraph Microservices["Microservices"]
         E["Skill Matching<br/>Python/Flask"]
-        F["Email Notifications<br/>Node/Express"]
+        F["Email Notifications<br/>Python/Flask"]
     end
     subgraph Data["Data Layer"]
         G[(MongoDB)]
@@ -178,14 +178,15 @@ python app.py
 
 The matching service will run on `http://localhost:6000`.
 
-#### 3. Notification Service (Node.js)
+#### 3. Notification Service (Python)
 
 ```bash
 cd notification-service
-npm install
+python -m venv venv
+pip install -r requirements.txt
 cp .env.example .env
 # Edit .env with your SMTP credentials
-npm run dev
+python app.py
 ```
 
 The notification service will run on `http://localhost:7000`.
@@ -210,6 +211,7 @@ GOOGLE_CLIENT_ID=your_google_oauth_web_client_id.apps.googleusercontent.com
 PORT=5000
 MATCHING_SERVICE_URL=http://localhost:6000
 NOTIFICATION_SERVICE_URL=http://localhost:7000
+NOTIFICATION_SERVICE_TIMEOUT_MS=30000
 NODE_ENV=development
 ```
 
@@ -220,6 +222,7 @@ SMTP_PORT=587
 SMTP_USER=your_email@gmail.com
 SMTP_PASSWORD=your_app_password
 EMAIL_FROM=noreply@skillswap.com
+SMTP_SECURE=starttls
 PORT=7000
 ```
 
@@ -271,7 +274,15 @@ VITE_GOOGLE_CLIENT_ID=your_google_oauth_web_client_id.apps.googleusercontent.com
 | Method | Endpoint | Description |
 |---|---|---|
 | `POST` | `/api/reviews` | Leave a review for a completed booking |
-| `GET` | `/api/reviews/:userId` | Get reviews for a user |
+| `GET` | `/api/reviews/:userId` | Get a user's review summary and populated reviews |
+
+### In-app Notifications
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/notifications` | Get recent notifications |
+| `GET` | `/api/notifications/unread-count` | Get total and per-type unread counts |
+| `PATCH` | `/api/notifications/:id/read` | Mark one notification read |
+| `PATCH` | `/api/notifications/read` | Mark all, or one notification type, read |
 
 ### Messaging
 | Method | Endpoint | Description |

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import api from '../api/axios';
 import AppShell from '../components/AppShell';
+import { updateUser } from '../redux/authSlice';
+import { fetchUnreadCounts, markNotificationTypeRead } from '../redux/notificationSlice';
 
 function Bookings() {
   const [bookings, setBookings] = useState([]);
@@ -12,6 +14,7 @@ function Bookings() {
   const [comment, setComment] = useState('');
   const [message, setMessage] = useState('');
   const currentUser = useSelector((state) => state.auth.user);
+  const dispatch = useDispatch();
 
   const fetchAll = async () => {
     try {
@@ -27,6 +30,7 @@ function Bookings() {
   };
 
   useEffect(() => {
+    dispatch(markNotificationTypeRead('booking'));
     let active = true;
     Promise.all([api.get('/bookings'), api.get('/reviews/mine')])
       .then(([bookingsRes, reviewedRes]) => {
@@ -38,11 +42,13 @@ function Bookings() {
         if (active) setMessage('Failed to load bookings');
       });
     return () => { active = false; };
-  }, []);
+  }, [dispatch]);
 
   const respondToBooking = async (id, status) => {
     try {
       await api.patch(`/bookings/${id}/status`, { status });
+      setMessage(`Booking ${status}.`);
+      dispatch(fetchUnreadCounts());
       await fetchAll();
     } catch (err) {
       setMessage(err.response?.data?.message || 'Action failed');
@@ -52,6 +58,9 @@ function Bookings() {
   const completeBooking = async (id) => {
     try {
       await api.patch(`/bookings/${id}/complete`);
+      const profile = await api.get('/users/me');
+      dispatch(updateUser(profile.data));
+      dispatch(fetchUnreadCounts());
       setMessage('Session completed — credits transferred!');
       await fetchAll();
     } catch (err) {
@@ -66,6 +75,7 @@ function Bookings() {
       setReviewingId(null);
       setComment('');
       await fetchAll();
+      dispatch(fetchUnreadCounts());
     } catch (err) {
       setMessage(err.response?.data?.message || 'Failed to submit review');
     }
@@ -78,7 +88,7 @@ function Bookings() {
       description="Keep every exchange in one place, from the first request to the moment the credits land."
       action={<Link className="primary-button" to="/browse">Find another skill <span>→</span></Link>}
     >
-      {message && <p className="status-message">{message}</p>}
+      {message && <p className={`status-message ${/failed|action|insufficient|could not/i.test(message) ? 'error' : ''}`} role="status">{message}</p>}
       {bookings.length === 0 && (
         <div className="empty-state"><strong>No exchanges yet</strong>Head to Discover skills and request your first session.</div>
       )}

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../redux/authSlice';
+import { clearNotifications, fetchUnreadCounts } from '../redux/notificationSlice';
 import Icon from './Icon';
 
 const links = [
@@ -22,9 +23,16 @@ const initials = (name = '') => name.split(' ').map((part) => part[0]).join('').
 function AppShell({ children, eyebrow, title, description, action }) {
   const dispatch = useDispatch();
   const user = useSelector((state) => state.auth.user);
+  const notificationCounts = useSelector((state) => state.notifications.counts);
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const navLinks = user?.role === 'admin' ? [...links, { to: '/admin', label: 'Admin', icon: 'settings' }] : links;
+
+  useEffect(() => {
+    dispatch(fetchUnreadCounts());
+    const timer = window.setInterval(() => dispatch(fetchUnreadCounts()), 30000);
+    return () => window.clearInterval(timer);
+  }, [dispatch]);
 
   useEffect(() => {
     if (!menuOpen) return undefined;
@@ -38,7 +46,11 @@ function AppShell({ children, eyebrow, title, description, action }) {
     };
   }, [menuOpen]);
 
-  const handleLogout = () => { dispatch(logout()); navigate('/'); };
+  const handleLogout = () => { dispatch(clearNotifications()); dispatch(logout()); navigate('/'); };
+  const badgeFor = (path) => path === '/dashboard'
+    ? notificationCounts.all
+    : path === '/bookings' ? notificationCounts.booking
+      : path === '/messages' ? notificationCounts.message : 0;
 
   return (
     <div className="app-frame">
@@ -46,7 +58,7 @@ function AppShell({ children, eyebrow, title, description, action }) {
         <div className="sidebar-head"><Link className="app-brand" to="/dashboard" aria-label="SkillSwap home"><Brand /></Link><button className="icon-button sidebar-close" type="button" onClick={() => setMenuOpen(false)} aria-label="Close menu"><Icon name="close" /></button></div>
         <div className="sidebar-label">Workspace</div>
         <nav className="app-nav" aria-label="Workspace navigation">
-          {navLinks.map((item) => <NavLink key={item.to} to={item.to} className="app-nav-link" onClick={() => setMenuOpen(false)}><Icon name={item.icon} /><span>{item.label}</span></NavLink>)}
+          {navLinks.map((item) => { const count = badgeFor(item.to); return <NavLink key={item.to} to={item.to} className="app-nav-link" onClick={() => setMenuOpen(false)}><Icon name={item.icon} /><span>{item.label}</span>{count > 0 && <span className="notification-badge" aria-label={`${count} unread notifications`}>{count > 99 ? '99+' : count}</span>}</NavLink>; })}
         </nav>
         <div className="sidebar-bottom">
           <div className="credit-mini"><span className="credit-mini-icon"><Icon name="wallet" size={16} /></span><div><small>Available balance</small><strong>{user?.creditBalance ?? 0} credits</strong></div></div>

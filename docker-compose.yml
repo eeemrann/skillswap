@@ -23,6 +23,7 @@ services:
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
       - EMAIL_FROM=${EMAIL_FROM}
+      - SMTP_SECURE=${SMTP_SECURE:-starttls}
     restart: unless-stopped
 
   server:
@@ -36,6 +37,7 @@ services:
       - PORT=5000
       - MATCHING_SERVICE_URL=http://matching-service:6000
       - NOTIFICATION_SERVICE_URL=http://notification-service:7000
+      - NOTIFICATION_SERVICE_TIMEOUT_MS=30000
     depends_on:
       - mongo
       - matching-service
@@ -47,6 +49,7 @@ services:
       context: ./client
       args:
         - VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+        - VITE_API_URL=${VITE_API_URL:-http://localhost:5000/api}
     ports:
       - "8080:80"
     depends_on:

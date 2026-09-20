@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { useSearchParams } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import api from '../api/axios';
+import { fetchUnreadCounts, markNotificationTypeRead } from '../redux/notificationSlice';
 
 function Messages() {
   const currentUser = useSelector((state) => state.auth.user);
+  const dispatch = useDispatch();
   const [searchParams] = useSearchParams();
   const [connections, setConnections] = useState([]);
   const [userId, setUserId] = useState(() => searchParams.get('with') || '');
@@ -24,6 +26,7 @@ function Messages() {
   }, [userId]);
 
   useEffect(() => {
+    dispatch(markNotificationTypeRead('message'));
     let active = true;
     api.get('/bookings').then((res) => {
       if (!active) return;
@@ -38,7 +41,7 @@ function Messages() {
     }).catch((err) => { if (active) setMessage(err.response?.data?.message || 'Could not load your booking connections.'); })
       .finally(() => { if (active) setLoadingConnections(false); });
     return () => { active = false; };
-  }, [currentUser?._id, currentUser?.id]);
+  }, [currentUser?._id, currentUser?.id, dispatch]);
 
   useEffect(() => {
     if (!userId) return undefined;
@@ -52,7 +55,7 @@ function Messages() {
 
   const sendMessage = async (event) => {
     event.preventDefault(); const cleanBody = body.trim(); if (!cleanBody) return;
-    try { await api.post(`/messages/${userId}`, { body: cleanBody }); setBody(''); await loadMessages(userId); }
+    try { await api.post(`/messages/${userId}`, { body: cleanBody }); setBody(''); await loadMessages(userId); setMessage('Message sent.'); dispatch(fetchUnreadCounts()); }
     catch (err) { setMessage(err.response?.data?.message || 'Message could not be sent.'); }
   };
 
@@ -65,7 +68,7 @@ function Messages() {
           {connections.map((connection) => <button key={connection.id} type="button" className={`conversation-person ${userId === connection.id ? 'active' : ''}`} onClick={() => setUserId(connection.id)}><span className="avatar">{connection.name.slice(0, 2).toUpperCase()}</span><span><strong>{connection.name}</strong><small>SkillSwap member</small></span></button>)}
         </aside>
         <section className="conversation-panel">
-          {message && <p className="status-message error">{message}</p>}
+          {message && <p className={`status-message ${message === 'Message sent.' ? '' : 'error'}`} role="status">{message}</p>}
           {!userId ? <div className="empty-state"><strong>Select a conversation</strong>Choose a member to start chatting.</div> : <>
             <div className="message-stream" aria-live="polite">
               {loadingMessages && <p className="form-hint">Loading conversation...</p>}

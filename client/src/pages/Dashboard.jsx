@@ -5,12 +5,14 @@ import { setCredentials } from '../redux/authSlice';
 import api from '../api/axios';
 import AppShell from '../components/AppShell';
 import Icon from '../components/Icon';
+import { fetchNotifications, fetchUnreadCounts, markNotificationRead } from '../redux/notificationSlice';
 
 const initials = (name = '') => name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase();
 
 function Dashboard() {
   const user = useSelector((state) => state.auth.user);
   const token = useSelector((state) => state.auth.token);
+  const { items: notifications, loading: notificationsLoading } = useSelector((state) => state.notifications);
   const dispatch = useDispatch();
   const [matches, setMatches] = useState([]);
   const [bookings, setBookings] = useState([]);
@@ -26,6 +28,8 @@ function Dashboard() {
       if (bookingResult.status === 'fulfilled') setBookings(bookingResult.value.data);
       setLoading(false);
     });
+    dispatch(fetchNotifications());
+    dispatch(fetchUnreadCounts());
     return () => { active = false; };
   }, [dispatch, token]);
 
@@ -52,6 +56,12 @@ function Dashboard() {
         <section className="surface surface-pad">
           <div className="section-heading"><div><p className="section-kicker">Your schedule</p><h2>Upcoming exchanges</h2></div><Link to="/bookings">Manage bookings <Icon name="arrow" size={14}/></Link></div>
           {!loading && upcoming.length === 0 ? <div className="empty-state"><strong>Your calendar is open</strong>Discover a teacher and request your first session.</div> : <div className="upcoming-grid">{upcoming.map((booking) => <article className="upcoming-card" key={booking._id}><span className={`booking-status ${booking.status}`}>{booking.status}</span><h3>{booking.skill}</h3><p>{new Date(booking.proposedTime).toLocaleString()}</p></article>)}</div>}
+        </section>
+        <section className="surface surface-pad">
+          <div className="section-heading"><div><p className="section-kicker">Recent activity</p><h2>Notifications</h2></div></div>
+          {notificationsLoading && <p className="form-hint">Loading activity...</p>}
+          {!notificationsLoading && notifications.length === 0 && <div className="empty-state"><strong>You are all caught up</strong>Booking, message, review, and credit updates will appear here.</div>}
+          <div className="notification-list">{notifications.slice(0, 8).map((notification) => <button className={`notification-item ${notification.read ? '' : 'unread'}`} type="button" key={notification._id} onClick={() => { if (!notification.read) dispatch(markNotificationRead(notification._id)); }}><span className="notification-dot"/><span><strong>{notification.message}</strong><small>{new Date(notification.createdAt).toLocaleString()}</small></span></button>)}</div>
         </section>
       </div>
     </AppShell>

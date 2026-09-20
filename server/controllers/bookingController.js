@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const Booking = require('../models/Booking');
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
-const { notify } = require('../services/notificationService');
+const { notify, createInAppNotification } = require('../services/notificationService');
 // CREATE a booking request
 exports.createBooking = async (req, res) => {
   try {
@@ -33,7 +33,11 @@ exports.createBooking = async (req, res) => {
     const booking = new Booking({ requester: req.userId, provider: providerId, skill, proposedTime: time });
     await booking.save();
     const requester = await User.findById(req.userId).select('name email');
-    notify('BOOKING_CREATED', provider.email, { actor: requester?.name || 'A SkillSwap member', skill, time: time.toLocaleString() });
+    const actor = requester?.name || 'A SkillSwap member';
+    await Promise.all([
+      createInAppNotification({ userId: provider._id, type: 'booking', message: `${actor} requested a skill swap with you`, relatedId: booking._id }),
+      notify('BOOKING_CREATED', provider.email, { actor, skill, time: time.toLocaleString() })
+    ]);
     res.status(201).json(booking);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
@@ -85,9 +89,17 @@ exports.updateBookingStatus = async (req, res) => {
 
     const requester = await User.findById(booking.requester).select('name email');
     const provider = await User.findById(booking.provider).select('name email');
-    notify(status === 'accepted' ? 'BOOKING_ACCEPTED' : 'BOOKING_DECLINED', requester.email, {
-      actor: provider.name, skill: booking.skill, time: new Date(booking.proposedTime).toLocaleString()
-    });
+    await Promise.all([
+      createInAppNotification({
+        userId: requester._id,
+        type: 'booking',
+        message: status === 'accepted' ? 'Your booking request was accepted' : 'Your booking request was declined',
+        relatedId: booking._id
+      }),
+      notify(status === 'accepted' ? 'BOOKING_ACCEPTED' : 'BOOKING_DECLINED', requester.email, {
+        actor: provider.name, skill: booking.skill, time: new Date(booking.proposedTime).toLocaleString()
+      })
+    ]);
     res.json(booking);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
@@ -136,7 +148,12 @@ exports.completeBooking = async (req, res) => {
     await booking.save({ session });
 
     await session.commitTransaction();
-    notify('BOOKING_COMPLETED', provider.email, { actor: requester.name, skill: booking.skill });
+    await Promise.all([
+      createInAppNotification({ userId: provider._id, type: 'booking', message: 'Your skill exchange was completed', relatedId: booking._id }),
+      createInAppNotification({ userId: provider._id, type: 'credit', message: 'You received 1 credit for a completed exchange', relatedId: booking._id }),
+      createInAppNotification({ userId: requester._id, type: 'credit', message: '1 credit was used for your completed exchange', relatedId: booking._id }),
+      notify('BOOKING_COMPLETED', provider.email, { actor: requester.name, skill: booking.skill })
+    ]);
     res.json({ message: 'Booking completed, credits transferred', booking });
   } catch (err) {
     await session.abortTransaction();

@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const Booking = require('../models/Booking');
 const Message = require('../models/Message');
+const User = require('../models/User');
+const { createInAppNotification } = require('../services/notificationService');
 
 async function areConnected(userId, otherUserId) {
   return Booking.exists({
@@ -28,6 +30,13 @@ exports.sendMessage = async (req, res) => {
   if (req.userId === req.params.userId) return res.status(400).json({ message: 'Cannot message yourself' });
   if (!(await areConnected(req.userId, req.params.userId))) return res.status(403).json({ message: 'Messaging is available after an accepted booking' });
   const message = await Message.create({ sender: req.userId, recipient: req.params.userId, booking: bookingId, body: body.trim() });
+  const sender = await User.findById(req.userId).select('name');
+  await createInAppNotification({
+    userId: req.params.userId,
+    type: 'message',
+    message: `${sender?.name || 'A SkillSwap member'} sent you a new message`,
+    relatedId: message._id
+  });
   res.status(201).json(message);
 };
 

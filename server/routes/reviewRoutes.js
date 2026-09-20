@@ -5,5 +5,6 @@ const router = express.Router();
 
 router.get('/mine', auth, getMyReviewedBookings);
 router.post('/', auth, createReview);
-router.get('/user/:userId', auth, getUserReviews);
+router.get('/user/:userId', auth, getUserReviews); // backwards-compatible alias
+router.get('/:userId', auth, getUserReviews);
 module.exports = router;
