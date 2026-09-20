@@ -5,6 +5,7 @@ import { GoogleLogin } from '@react-oauth/google';
 import api from '../api/axios';
 import { setCredentials } from '../redux/authSlice';
 import AuthLayout from '../components/AuthLayout';
+import.meta.env.VITE_GOOGLE_CLIENT_ID
 
 function Login(){
   const [form,setForm]=useState({email:'',password:''}); const [error,setError]=useState(''); const [isSubmitting,setIsSubmitting]=useState(false); const navigate=useNavigate(); const dispatch=useDispatch();

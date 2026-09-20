@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Brand } from '../components/AppShell';
 import Icon from '../components/Icon';
 import './Landing.css';
+import.meta.env.VITE_GOOGLE_CLIENT_ID
 
 function Landing() {
   return (

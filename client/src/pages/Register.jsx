@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import AuthLayout from '../components/AuthLayout';
+import.meta.env.VITE_GOOGLE_CLIENT_ID
 
 function Register(){
   const [form,setForm]=useState({name:'',email:'',password:''}); const [error,setError]=useState(''); const [isSubmitting,setIsSubmitting]=useState(false); const navigate=useNavigate();
