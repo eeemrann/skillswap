@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { setCredentials } from '../redux/authSlice';
 import { Link } from 'react-router-dom';
+import { setCredentials } from '../redux/authSlice';
 import api from '../api/axios';
 import AppShell from '../components/AppShell';
+import Icon from '../components/Icon';
 
 const initials = (name = '') => name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase();
 
@@ -12,56 +13,50 @@ function Dashboard() {
   const token = useSelector((state) => state.auth.token);
   const dispatch = useDispatch();
   const [matches, setMatches] = useState([]);
+  const [bookings, setBookings] = useState([]);
   const [matchError, setMatchError] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const refreshUser = async () => {
-      try {
-        const res = await api.get('/users/me');
-        dispatch(setCredentials({ user: res.data, token }));
-      } catch (err) {
-        console.log('Failed to refresh user:', err.message);
-      }
-    };
-    if (token) refreshUser();
+    if (!token) return undefined;
+    let active = true;
+    api.get('/users/me').then((res) => { if (active) dispatch(setCredentials({ user: res.data, token })); }).catch(() => {});
+    Promise.allSettled([api.get('/matches'), api.get('/bookings')]).then(([matchResult, bookingResult]) => {
+      if (!active) return;
+      if (matchResult.status === 'fulfilled') setMatches(matchResult.value.data);
+      else setMatchError('Recommendations are temporarily unavailable.');
+      if (bookingResult.status === 'fulfilled') setBookings(bookingResult.value.data);
+      setLoading(false);
+    });
+    return () => { active = false; };
   }, [dispatch, token]);
 
-  useEffect(() => {
-    const fetchMatches = async () => {
-      try {
-        const res = await api.get('/matches');
-        setMatches(res.data);
-        setMatchError('');
-      } catch (err) {
-        console.error('Matching fetch failed:', err.message);
-        setMatchError('Matching service is temporarily unavailable');
-      }
-    };
-    if (token) fetchMatches();
-  }, [token]);
+  const upcoming = bookings.filter((item) => ['pending', 'accepted'].includes(item.status)).slice(0, 3);
+  const completed = bookings.filter((item) => item.status === 'completed').length;
 
   return (
-    <AppShell eyebrow="Your workspace" title={`Good to see you, ${user?.name?.split(' ')[0] || 'there'}.`} description="A quick look at your learning momentum and the people you could grow with next." action={<Link className="primary-button" to="/browse">Discover a skill <span>→</span></Link>}>
-      <div className="content-grid" style={{ gap: 28 }}>
+    <AppShell eyebrow="Workspace overview" title={`Welcome back, ${user?.name?.split(' ')[0] || 'there'}.`} description="Everything you need to keep learning, teaching, and building momentum." action={<Link className="primary-button" to="/browse">Explore skills <Icon name="arrow" size={16}/></Link>}>
+      <div className="content-grid dashboard-grid">
         <div className="stat-row">
-          <div className="stat-card"><small>Available credits</small><strong>{user?.creditBalance ?? '—'} <em>hrs</em></strong></div>
-          <div className="stat-card"><small>Recommended matches</small><strong>{matches.length}</strong></div>
-          <div className="stat-card"><small>Profile status</small><strong>{user?.skillsOffered?.length ? 'Live' : 'Start'}</strong></div>
+          <div className="stat-card"><small>Available credits</small><strong>{user?.creditBalance ?? 0} <em>hours</em></strong></div>
+          <div className="stat-card"><small>Recommended matches</small><strong>{loading ? '...' : matches.length}</strong></div>
+          <div className="stat-card"><small>Completed exchanges</small><strong>{loading ? '...' : completed}</strong></div>
         </div>
         <div className="content-grid two-column">
           <section className="surface surface-pad">
-            <div className="dashboard-welcome"><span className="avatar">{initials(user?.name)}</span><div><p className="section-kicker" style={{ marginBottom: 4 }}>Your next best connection</p><h2 style={{ margin: 0, fontSize: 22 }}>People who fit your curiosity</h2></div></div>
-            <div style={{ marginTop: 24 }}>
-              {matchError && <p className="status-message error">{matchError}</p>}
-              {!matchError && matches.length === 0 && <div className="empty-state"><strong>Your recommendations are warming up</strong>Complete your skill profile to unlock more relevant matches.</div>}
-              <div className="match-list">{matches.map((match) => <div className="match-card" key={match.id || match._id}><div><h3>{match.name}</h3><p>Shared interests: {match.matchedSkills?.join(', ') || 'A promising overlap'}</p></div><span className="match-score">{match.score} match</span></div>)}</div>
-            </div>
+            <div className="section-heading"><div><p className="section-kicker">Recommended for you</p><h2>People worth meeting</h2></div><Link to="/browse">View all <Icon name="arrow" size={14}/></Link></div>
+            {matchError && <p className="status-message error">{matchError}</p>}
+            {!matchError && !loading && matches.length === 0 && <div className="empty-state"><strong>Complete your skill profile</strong>Add what you can teach and want to learn to unlock tailored matches.</div>}
+            <div className="match-list">{matches.slice(0, 4).map((match) => <article className="match-card" key={match.id || match._id}><div className="match-person"><span className="avatar avatar-small">{initials(match.name)}</span><div><h3>{match.name}</h3><p>{match.matchedSkills?.join(' · ') || 'A promising skill overlap'}</p></div></div><span className="match-score">{match.score || 'New'} match</span></article>)}</div>
           </section>
-          <aside className="surface surface-pad profile-card"><p className="section-kicker">Your exchange profile</p><h2>{user?.name || 'Your profile'}</h2><p>{user?.skillsOffered?.length ? 'You are ready to share what you know.' : 'Add a few skills so the right people can find you.'}</p><div className="credit-balance"><small>Time credit balance</small><strong>{user?.creditBalance ?? 0} <span>hours</span></strong></div><Link className="secondary-button" to="/edit-skills">Edit skill profile <span>→</span></Link></aside>
+          <aside className="surface surface-pad profile-card"><p className="section-kicker">Your profile</p><span className="profile-avatar">{initials(user?.name)}</span><h2>{user?.name || 'Your profile'}</h2><p>{user?.skillsOffered?.length ? `${user.skillsOffered.length} skills ready to share with the community.` : 'Add your strengths so the right learners can find you.'}</p><div className="credit-balance"><small>Time credit balance</small><strong>{user?.creditBalance ?? 0} <span>credits</span></strong></div><Link className="secondary-button" to="/edit-skills">Improve profile <Icon name="arrow" size={15}/></Link></aside>
         </div>
+        <section className="surface surface-pad">
+          <div className="section-heading"><div><p className="section-kicker">Your schedule</p><h2>Upcoming exchanges</h2></div><Link to="/bookings">Manage bookings <Icon name="arrow" size={14}/></Link></div>
+          {!loading && upcoming.length === 0 ? <div className="empty-state"><strong>Your calendar is open</strong>Discover a teacher and request your first session.</div> : <div className="upcoming-grid">{upcoming.map((booking) => <article className="upcoming-card" key={booking._id}><span className={`booking-status ${booking.status}`}>{booking.status}</span><h3>{booking.skill}</h3><p>{new Date(booking.proposedTime).toLocaleString()}</p></article>)}</div>}
+        </section>
       </div>
     </AppShell>
   );
 }
-
 export default Dashboard;

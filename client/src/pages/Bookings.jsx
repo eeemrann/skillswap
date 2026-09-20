@@ -163,12 +163,13 @@ function Bookings() {
               </div>
 
               {reviewingId === booking._id && (
-                <div className="stack-actions" style={{ marginTop: 12, width: '100%' }}>
-                  <select value={rating} onChange={(e) => setRating(Number(e.target.value))}>
-                    {[5, 4, 3, 2, 1].map((n) => <option key={n} value={n}>{n} stars</option>)}
-                  </select>
+                <div className="review-panel">
+                  <div><strong>How was your exchange?</strong><p>Your feedback helps keep the community thoughtful.</p></div>
+                  <div className="star-rating" role="radiogroup" aria-label="Rating">
+                    {[1, 2, 3, 4, 5].map((n) => <button type="button" role="radio" aria-checked={rating === n} aria-label={`${n} stars`} className={n <= rating ? 'active' : ''} key={n} onClick={() => setRating(n)}>★</button>)}
+                  </div>
                   <textarea
-                    placeholder="Optional comment"
+                    placeholder="Share a few words about your experience (optional)"
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
                   />
