@@ -26,7 +26,19 @@ function Bookings() {
     }
   };
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => {
+    let active = true;
+    Promise.all([api.get('/bookings'), api.get('/reviews/mine')])
+      .then(([bookingsRes, reviewedRes]) => {
+        if (!active) return;
+        setBookings(bookingsRes.data);
+        setReviewedIds(reviewedRes.data);
+      })
+      .catch(() => {
+        if (active) setMessage('Failed to load bookings');
+      });
+    return () => { active = false; };
+  }, []);
 
   const respondToBooking = async (id, status) => {
     try {

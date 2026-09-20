@@ -24,24 +24,24 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route
           path="/dashboard"
-          element={token ? <Dashboard /> : <Navigate to="/login" />}
+          element={token ? <Dashboard /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/edit-skills"
-          element={token ? <EditSkills /> : <Navigate to="/login" />}
+          element={token ? <EditSkills /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/bookings"
-          element={token ? <Bookings /> : <Navigate to="/login" />}
+          element={token ? <Bookings /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/browse"
-          element={token ? <Browse /> : <Navigate to="/login" />}
+          element={token ? <Browse /> : <Navigate to="/login" replace />}
         />
-        <Route path="/credits" element={token ? <CreditHistory /> : <Navigate to="/login" />} />
-        <Route path="/messages" element={token ? <Messages /> : <Navigate to="/login" />} />
-        <Route path="/admin" element={token && isAdmin ? <AdminDashboard /> : <Navigate to={token ? '/dashboard' : '/login'} />} />
-        <Route path="*" element={<Navigate to={token ? '/dashboard' : '/login'} />} />
+        <Route path="/credits" element={token ? <CreditHistory /> : <Navigate to="/login" replace />} />
+        <Route path="/messages" element={token ? <Messages /> : <Navigate to="/login" replace />} />
+        <Route path="/admin" element={token && isAdmin ? <AdminDashboard /> : <Navigate to={token ? '/dashboard' : '/login'} replace />} />
+        <Route path="*" element={<Navigate to={token ? '/dashboard' : '/login'} replace />} />
       </Routes>
     </BrowserRouter>
   );

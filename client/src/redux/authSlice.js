@@ -7,7 +7,7 @@ const normalize = (user) => ({ ...user, id: user.id || user._id });
 const authSlice = createSlice({
   name: 'auth',
   initialState: {
-    user: storedUser ? JSON.parse(storedUser) : null,
+    user: storedUser ? normalize(JSON.parse(storedUser)) : null,
     token: localStorage.getItem('token') || null
   },
   reducers: {

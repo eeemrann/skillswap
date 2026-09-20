@@ -17,7 +17,19 @@ function AdminDashboard() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    let active = true;
+    Promise.all([api.get('/admin/stats'), api.get('/admin/users')])
+      .then(([statsRes, usersRes]) => {
+        if (!active) return;
+        setStats(statsRes.data);
+        setUsers(usersRes.data);
+      })
+      .catch((err) => {
+        if (active) setMessage(err.response?.data?.message || 'Admin data could not be loaded.');
+      });
+    return () => { active = false; };
+  }, []);
 
   const updateStatus = async (id, status) => {
     try {
