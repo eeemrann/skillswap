@@ -1,0 +1,22 @@
+# Environment files
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Node
+node_modules/
+
+# Build outputs
+build/
+dist/
+
+# Python
+__pycache__/
+.venv/
+venv/
+
+# Misc
+.DS_Store
