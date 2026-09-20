@@ -10,6 +10,7 @@ import Landing from './pages/Landing';
 import CreditHistory from './pages/CreditHistory';
 import Messages from './pages/Messages';
 import AdminDashboard from './pages/AdminDashboard';
+import OnboardingModal from './components/OnboardingModal';
 
 function App() {
   const token = useSelector((state) => state.auth.token);
@@ -43,6 +44,7 @@ function App() {
         <Route path="/admin" element={token && isAdmin ? <AdminDashboard /> : <Navigate to={token ? '/dashboard' : '/login'} replace />} />
         <Route path="*" element={<Navigate to={token ? '/dashboard' : '/login'} replace />} />
       </Routes>
+      <OnboardingModal />
     </BrowserRouter>
   );
 }
