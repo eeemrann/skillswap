@@ -1,8 +1,11 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect } from 'react';
 import { bindClerkTokenGetter } from './api/axios';
+import api from './api/axios';
+import { updateUser, logout } from './redux/authSlice';
+import { fetchUnreadCounts } from './redux/notificationSlice';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -30,9 +33,26 @@ function PublicAuthRoute({ children }) {
 }
 
 function AppRoutes() {
-  const { getToken } = useAuth();
+  const { getToken, isSignedIn, isLoaded } = useAuth();
+  const dispatch = useDispatch();
   const user = useSelector((state) => state.auth.user);
   useEffect(() => { bindClerkTokenGetter(getToken); return () => bindClerkTokenGetter(null); }, [getToken]);
+  useEffect(() => {
+    if (!isLoaded) return undefined;
+    if (!isSignedIn) {
+      dispatch(logout());
+      return undefined;
+    }
+    let active = true;
+    api.get('/users/me').then((res) => {
+      if (!active) return;
+      dispatch(updateUser(res.data));
+      dispatch(fetchUnreadCounts());
+    }).catch((error) => {
+      if (active) console.error('Failed to sync MongoDB user record:', error);
+    });
+    return () => { active = false; };
+  }, [dispatch, isLoaded, isSignedIn]);
 
   return <Routes>
     <Route path="/" element={<Landing />} />

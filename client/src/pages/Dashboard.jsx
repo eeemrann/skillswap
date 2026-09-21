@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useAuth } from '@clerk/clerk-react';
 import { Link } from 'react-router-dom';
-import { setCredentials } from '../redux/authSlice';
 import api from '../api/axios';
 import AppShell from '../components/AppShell';
 import Icon from '../components/Icon';
@@ -23,7 +22,6 @@ function Dashboard() {
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return undefined;
     let active = true;
-    api.get('/users/me').then((res) => { if (active) dispatch(setCredentials({ user: res.data, token: true })); }).catch(() => { if (active) setLoadError('Your profile could not be refreshed.'); });
     Promise.allSettled([api.get('/matches'), api.get('/bookings')]).then(([matchResult, bookingResult]) => {
       if (!active) return;
       setMatches(matchResult.status === 'fulfilled' ? matchResult.value.data : []);
