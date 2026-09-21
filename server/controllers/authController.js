@@ -116,12 +116,23 @@ exports.login = async (req, res) => {
     }
 
     if (user.emailVerified !== true) {
-      if (!user.emailVerificationExpires || user.emailVerificationExpires <= new Date()) {
-        const code = issueVerificationCode(user);
-        await user.save();
-        await queueEmail('EMAIL_VERIFICATION', user.email, { actor: user.name, code, minutes: Math.floor(VERIFICATION_TTL_MS / 60000) });
-      }
-      return res.status(403).json({ message: 'Verify your email before signing in', requiresVerification: true, email: user.email });
+      // Always replace and resend the code after a correct password. A previous
+      // queue/provider failure must not leave the user stuck with an unknown code.
+      const code = issueVerificationCode(user);
+      await user.save();
+      const queued = await queueEmail('EMAIL_VERIFICATION', user.email, {
+        actor: user.name,
+        code,
+        minutes: Math.floor(VERIFICATION_TTL_MS / 60000)
+      });
+      return res.status(403).json({
+        message: queued
+          ? 'A new verification code was sent to your email.'
+          : 'Your email needs verification, but the code could not be queued. Use Resend code to try again.',
+        requiresVerification: true,
+        verificationEmailQueued: Boolean(queued),
+        email: user.email
+      });
     }
 
     if (user.status === 'suspended') {

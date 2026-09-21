@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const { login, verifyEmail } = require('../controllers/authController');
+const notificationService = require('../services/notificationService');
 
 jest.mock('bcryptjs');
 jest.mock('../models/User');
@@ -15,13 +16,15 @@ describe('local email verification', () => {
   afterEach(() => jest.clearAllMocks());
 
   test('blocks a new unverified account after validating its password', async () => {
-    User.findOne.mockReturnValue({ select: jest.fn().mockResolvedValue({ email: 'member@example.com', password: 'hash', emailVerified: false, save: jest.fn() }) });
+    User.findOne.mockReturnValue({ select: jest.fn().mockResolvedValue({ email: 'member@example.com', name: 'Member', password: 'hash', emailVerified: false, save: jest.fn() }) });
     bcrypt.compare.mockResolvedValue(true);
+    notificationService.queueEmail.mockResolvedValue({ _id: 'email-job' });
     const res = response();
     await login({ body: { email: ' MEMBER@example.com ', password: 'password123' } }, res);
     expect(bcrypt.compare).toHaveBeenCalledWith('password123', 'hash');
     expect(res.status).toHaveBeenCalledWith(403);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ requiresVerification: true, email: 'member@example.com' }));
+    expect(notificationService.queueEmail).toHaveBeenCalledWith('EMAIL_VERIFICATION', 'member@example.com', expect.objectContaining({ code: expect.stringMatching(/^\d{6}$/) }));
   });
 
   test('verifies an unexpired six-digit code and removes the secret', async () => {
