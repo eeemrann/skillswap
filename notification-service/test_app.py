@@ -17,8 +17,8 @@ class NotificationServiceTest(unittest.TestCase):
         response = self.client.post('/notify', json={'type': 'BOOKING_CREATED', 'recipientEmail': 'a@example.com', 'data': {}})
         self.assertEqual(response.status_code, 401)
 
-    @patch.dict(os.environ, {'SMTP_HOST': '', 'SMTP_USER': '', 'SMTP_PASSWORD': ''})
-    def test_authorized_request_validates_smtp_configuration(self):
+    @patch.dict(os.environ, {'RESEND_API_KEY': ''})
+    def test_authorized_request_validates_email_provider_configuration(self):
         response = self.client.post('/notify', headers={'X-Notification-Key': 'test-secret'}, json={
             'type': 'EMAIL_VERIFICATION', 'recipientEmail': 'a@example.com',
             'data': {'actor': 'A', 'code': '123456', 'minutes': 10}
