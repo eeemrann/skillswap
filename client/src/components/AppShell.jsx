@@ -59,7 +59,11 @@ function AppShell({ children, eyebrow, title, description, action }) {
   return (
     <div className="app-frame">
       <aside className={`sidebar ${menuOpen ? 'open' : ''}`}>
-        <div className="sidebar-head"><Link className="app-brand" to="/dashboard" aria-label="SkillSwap home"><Brand /></Link><button className="icon-button sidebar-close" type="button" onClick={() => setMenuOpen(false)} aria-label="Close menu"><Icon name="close" /></button></div>
+        <div className="sidebar-head">
+  <Link className="app-brand" to="/dashboard" aria-label="SkillSwap home">
+    <Brand />
+  </Link>
+</div>
         <div className="sidebar-label">Workspace</div>
         <nav className="app-nav" aria-label="Workspace navigation">
           {navLinks.map((item) => { const count = badgeFor(item.to); return <NavLink key={item.to} to={item.to} className="app-nav-link" onClick={() => setMenuOpen(false)}><Icon name={item.icon} /><span>{item.label}</span>{count > 0 && <span className="notification-badge" aria-label={`${count} unread notifications`}>{count > 99 ? '99+' : count}</span>}</NavLink>; })}
