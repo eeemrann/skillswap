@@ -1,5 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import { useAuth } from '@clerk/clerk-react';
+import { useEffect } from 'react';
+import { setClerkTokenGetter } from './api/axios';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -13,7 +16,9 @@ import AdminDashboard from './pages/AdminDashboard';
 import OnboardingModal from './components/OnboardingModal';
 
 function App() {
-  const token = useSelector((state) => state.auth.token);
+  const { isSignedIn, getToken } = useAuth();
+  useEffect(() => { setClerkTokenGetter(getToken); return () => setClerkTokenGetter(null); }, [getToken]);
+  const token = isSignedIn;
   const user = useSelector((state) => state.auth.user);
   const isAdmin = user?.role === 'admin';
 

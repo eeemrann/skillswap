@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
+import { useClerk, UserButton, useUser } from '@clerk/clerk-react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../redux/authSlice';
 import { clearNotifications, fetchUnreadCounts } from '../redux/notificationSlice';
 import Icon from './Icon';
-import api from '../api/axios';
 
 const links = [
   { to: '/dashboard', label: 'Overview', icon: 'home' },
@@ -24,6 +24,8 @@ const initials = (name = '') => name.split(' ').map((part) => part[0]).join('').
 function AppShell({ children, eyebrow, title, description, action }) {
   const dispatch = useDispatch();
   const user = useSelector((state) => state.auth.user);
+  const { signOut } = useClerk();
+  const { user: clerkUser } = useUser();
   const notificationCounts = useSelector((state) => state.notifications.counts);
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -50,7 +52,7 @@ function AppShell({ children, eyebrow, title, description, action }) {
     };
   }, [menuOpen]);
 
-  const handleLogout = async () => { try { await api.post('/auth/logout'); } catch { /* clear the browser session even if the API is unavailable */ } dispatch(clearNotifications()); dispatch(logout()); navigate('/'); };
+  const handleLogout = async () => { dispatch(clearNotifications()); dispatch(logout()); await signOut(); navigate('/'); };
   const badgeFor = (path) => path === '/dashboard'
     ? notificationCounts.all
     : path === '/bookings' ? notificationCounts.booking
@@ -70,7 +72,7 @@ function AppShell({ children, eyebrow, title, description, action }) {
         </nav>
         <div className="sidebar-bottom">
           <div className="credit-mini"><span className="credit-mini-icon"><Icon name="wallet" size={16} /></span><div><small>Available balance</small><strong>{user?.creditBalance ?? 0} credits</strong></div></div>
-          <div className="user-menu"><span className="avatar avatar-small">{initials(user?.name)}</span><div><strong>{user?.name || 'SkillSwap member'}</strong><small>{user?.email || 'Community member'}</small></div><button className="icon-button" type="button" onClick={handleLogout} aria-label="Sign out" title="Sign out"><Icon name="logout" size={17} /></button></div>
+          <div className="user-menu"><UserButton appearance={{ elements: { avatarBox: 'avatar avatar-small' } }} afterSignOutUrl="/" /><div><strong>{user?.name || clerkUser?.fullName || 'SkillSwap member'}</strong><small>{user?.email || clerkUser?.primaryEmailAddress?.emailAddress || 'Community member'}</small></div><button className="icon-button" type="button" onClick={handleLogout} aria-label="Sign out" title="Sign out"><Icon name="logout" size={17} /></button></div>
         </div>
       </aside>
       {menuOpen && <button className="sidebar-scrim" type="button" onClick={() => setMenuOpen(false)} aria-label="Close navigation" />}

@@ -3,6 +3,7 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const mongoose = require('mongoose');
+const { clerkMiddleware } = require('@clerk/express');
 
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
@@ -27,6 +28,7 @@ app.use(cors({
   }
 }));
 app.use(express.json({ limit: '100kb' }));
+app.use(clerkMiddleware());
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,

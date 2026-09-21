@@ -13,8 +13,11 @@ const api = axios.create({
   baseURL: apiBaseUrl
 });
 
-api.interceptors.request.use((config) => {
-  const token = sessionStorage.getItem('token');
+let getClerkToken = async () => null;
+export const setClerkTokenGetter = (getter) => { getClerkToken = getter || (async () => null); };
+
+api.interceptors.request.use(async (config) => {
+  const token = await getClerkToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -26,7 +29,6 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      sessionStorage.removeItem('token');
       sessionStorage.removeItem('user');
       window.location.href = '/login';
     }

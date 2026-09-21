@@ -1,42 +1,40 @@
-const jwt = require('jsonwebtoken');
+const { getAuth, clerkClient } = require('@clerk/express');
 const User = require('../models/User');
 
-module.exports = async function (req, res, next) {
-  // Expect header: Authorization: Bearer <token>
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ message: 'No token provided' });
-  }
-
-  const token = authHeader.split(' ')[1];
-
+// Verifies Clerk's JWT, then maps the Clerk identity to the existing Mongo user.
+module.exports = async function auth(req, res, next) {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.userId).select('role status +tokenVersion');
+    const { userId } = getAuth(req);
+    if (!userId) return res.status(401).json({ message: 'Authentication required' });
+
+    const clerkUser = await clerkClient.users.getUser(userId);
+    const email = clerkUser.emailAddresses?.find((item) => item.id === clerkUser.primaryEmailAddressId)?.emailAddress
+      || clerkUser.emailAddresses?.[0]?.emailAddress;
+    if (!email) return res.status(401).json({ message: 'Your Clerk account has no email address' });
+
+    let user = await User.findOne({ clerkId: userId });
     if (!user) {
-      return res.status(401).json({ message: 'Invalid or expired token' });
+      user = await User.findOne({ email: email.toLowerCase() });
+      if (user) {
+        user.clerkId = userId;
+        user.authProvider = 'clerk';
+        await user.save();
+      } else {
+        user = await User.create({ clerkId: userId, email: email.toLowerCase(), name: [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || 'SkillSwap member', authProvider: 'clerk', password: undefined, profilePicture: clerkUser.imageUrl || '' });
+      }
     }
-
-    if (user.status === 'suspended') {
-      return res.status(403).json({ message: 'This account has been suspended' });
-    }
-    if ((decoded.tokenVersion || 0) !== (user.tokenVersion || 0)) {
-      return res.status(401).json({ message: 'Invalid or expired token' });
-    }
-
+    if (user.status === 'suspended') return res.status(403).json({ message: 'This account has been suspended' });
     req.userId = user._id.toString();
-    req.userRole = user.role || decoded.role || 'user';
-    next(); // token is valid, continue to the actual route
+    req.userRole = user.role || 'user';
+    req.clerkUserId = userId;
+    next();
   } catch (err) {
-    res.status(401).json({ message: 'Invalid or expired token' });
+    console.error('Clerk auth failed:', err.message);
+    return res.status(401).json({ message: 'Invalid or expired Clerk session' });
   }
 };
 
-module.exports.requireAdmin = function (req, res, next) {
-  if (req.userRole !== 'admin') {
-    return res.status(403).json({ message: 'Admin access required' });
-  }
-
+module.exports.requireAdmin = function requireAdmin(req, res, next) {
+  if (req.userRole !== 'admin') return res.status(403).json({ message: 'Admin access required' });
   next();
 };

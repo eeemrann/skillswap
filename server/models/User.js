@@ -3,8 +3,9 @@ const mongoose = require('mongoose');
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true, maxlength: 80 },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true, maxlength: 254 },
-  password: { type: String, required: function () { return this.authProvider !== 'google'; } }, // hashed; optional for Google-only accounts
-  authProvider: { type: String, enum: ['local', 'google'], default: 'local' },
+  clerkId: { type: String, unique: true, sparse: true, index: true },
+  password: { type: String, required: function () { return this.authProvider === 'local'; } }, // Clerk-managed accounts do not store a local password
+  authProvider: { type: String, enum: ['local', 'google', 'clerk'], default: 'local' },
   googleId: { type: String, unique: true, sparse: true },
   profilePicture: { type: String, default: '' },
   role: { type: String, enum: ['user', 'admin'], default: 'user' },
