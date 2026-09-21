@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import { useAuth } from '@clerk/clerk-react';
 import { Link } from 'react-router-dom';
 import { setCredentials } from '../redux/authSlice';
 import api from '../api/axios';
@@ -11,7 +12,7 @@ const initials = (name = '') => name.split(' ').map((part) => part[0]).join('').
 
 function Dashboard() {
   const user = useSelector((state) => state.auth.user);
-  const token = useSelector((state) => state.auth.token);
+  const { isLoaded, isSignedIn } = useAuth();
   const { items: notifications, loading: notificationsLoading } = useSelector((state) => state.notifications);
   const dispatch = useDispatch();
   const [matches, setMatches] = useState([]);
@@ -20,9 +21,9 @@ function Dashboard() {
   const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
-    if (!token) return undefined;
+    if (!isLoaded || !isSignedIn) return undefined;
     let active = true;
-    api.get('/users/me').then((res) => { if (active) dispatch(setCredentials({ user: res.data, token })); }).catch(() => { if (active) setLoadError('Your profile could not be refreshed.'); });
+    api.get('/users/me').then((res) => { if (active) dispatch(setCredentials({ user: res.data, token: true })); }).catch(() => { if (active) setLoadError('Your profile could not be refreshed.'); });
     Promise.allSettled([api.get('/matches'), api.get('/bookings')]).then(([matchResult, bookingResult]) => {
       if (!active) return;
       setMatches(matchResult.status === 'fulfilled' ? matchResult.value.data : []);
@@ -33,7 +34,7 @@ function Dashboard() {
     dispatch(fetchNotifications());
     dispatch(fetchUnreadCounts());
     return () => { active = false; };
-  }, [dispatch, token]);
+  }, [dispatch, isLoaded, isSignedIn]);
 
   const upcoming = bookings.filter((item) => ['pending', 'accepted'].includes(item.status)).slice(0, 3);
   const completed = bookings.filter((item) => item.status === 'completed').length;

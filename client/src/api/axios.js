@@ -13,27 +13,24 @@ const api = axios.create({
   baseURL: apiBaseUrl
 });
 
-let getClerkToken = async () => null;
-export const setClerkTokenGetter = (getter) => { getClerkToken = getter || (async () => null); };
+let clerkTokenGetter = null;
+export const bindClerkTokenGetter = (getterFn) => { clerkTokenGetter = getterFn || null; };
 
 api.interceptors.request.use(async (config) => {
-  const token = await getClerkToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  if (clerkTokenGetter) {
+    try {
+      const token = await clerkTokenGetter();
+      if (token) config.headers.Authorization = `Bearer ${token}`;
+    } catch {
+      // Proceed without a header if Clerk cannot provide a session token.
+    }
   }
   return config;
 });
 
-// If the token is invalid/expired, clear it and send the user back to login
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      sessionStorage.removeItem('user');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
 export default api;
