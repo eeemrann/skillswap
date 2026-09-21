@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '@clerk/clerk-react';
 import api from '../api/axios';
 import { updateUser } from '../redux/authSlice';
 import Icon from './Icon';
@@ -26,8 +25,8 @@ function SkillEntry({ id, label, description, value, onChange, placeholder, tone
 }
 
 function OnboardingModal() {
-  const { isSignedIn, isLoaded } = useAuth();
   const user = useSelector((state) => state.auth.user);
+  const token = useSelector((state) => state.auth.token);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
@@ -40,9 +39,8 @@ function OnboardingModal() {
   const [success, setSuccess] = useState(false);
 
   const userId = user?.id || user?._id || '';
-  const isAuthRoute = location.pathname === '/' || location.pathname.startsWith('/login') || location.pathname.startsWith('/register');
-  const isAppRoute = !isAuthRoute;
-  const needsOnboarding = Boolean(isLoaded && isSignedIn && userId && isAppRoute && (user.skillsOffered?.length || 0) === 0 && (user.skillsWanted?.length || 0) === 0 && dismissedFor !== userId);
+  const isAppRoute = !['/', '/login', '/register'].includes(location.pathname);
+  const needsOnboarding = Boolean(token && userId && isAppRoute && (user.skillsOffered?.length || 0) === 0 && (user.skillsWanted?.length || 0) === 0 && dismissedFor !== userId);
   const wantedSkills = useMemo(() => parseSkills(wanted), [wanted]);
   const offeredSkills = useMemo(() => parseSkills(offered), [offered]);
   const progress = (wantedSkills.length ? 1 : 0) + (offeredSkills.length ? 1 : 0);
