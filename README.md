@@ -1,18 +1,10 @@
-# SkillSwap 🤝
+# SkillSwap
 
-[![CI](https://github.com/eeemrann/skillswap/actions/workflows/ci.yml/badge.svg)](https://github.com/eeemrann/skillswap/actions/workflows/ci.yml)
-[![Node.js Version](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org/)
-[![React Version](https://img.shields.io/badge/react-19-blue.svg)](https://react.dev/)
-[![Express Version](https://img.shields.io/badge/express-5.2-lightgrey.svg)](https://expressjs.com/)
-[![Python Version](https://img.shields.io/badge/python-3.11+-yellow.svg)](https://www.python.org/)
-[![MongoDB](https://img.shields.io/badge/MongoDB-7.0%20(ReplicaSet)-green.svg)](https://www.mongodb.com/)
-[![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](https://opensource.org/licenses/ISC)
-
-> **SkillSwap** is a peer-to-peer knowledge exchange platform built on a time-banking economy. Members teach skills they love, learn subjects they are curious about, and exchange **time credits** instead of money—one hour taught equals one hour earned.
+SkillSwap is a peer-to-peer knowledge exchange platform built on a time-banking economy. Members teach skills they love, learn subjects they are curious about, and exchange time credits instead of money—one hour taught equals one hour earned.
 
 ---
 
-## 🌐 Live Deployments
+## Live Deployments
 
 | Component | URL | Hosting Platform |
 |---|---|---|
@@ -26,56 +18,24 @@
 
 ---
 
-## 📖 Table of Contents
-
-- [Core Concepts & Highlights](#-core-concepts--highlights)
-- [Key Features](#-key-features)
-- [System Architecture](#-system-architecture)
-  - [High-Level Architecture](#high-level-architecture)
-  - [Frontend Architecture](#frontend-architecture)
-  - [Backend & Worker Pipeline](#backend--worker-pipeline)
-  - [Database Schema (ERD)](#database-schema-erd)
-  - [Booking & Credit Lifecycle](#booking--credit-lifecycle)
-  - [Smart Matching Algorithm](#smart-matching-algorithm)
-- [Technology Stack](#-technology-stack)
-- [Repository Structure](#-repository-structure)
-- [Quick Start with Docker Compose](#-quick-start-with-docker-compose)
-- [Manual Local Development](#-manual-local-development)
-  - [Prerequisites](#prerequisites)
-  - [1. MongoDB Replica Set](#1-mongodb-replica-set)
-  - [2. Server API](#2-server-api)
-  - [3. Frontend Client](#3-frontend-client)
-  - [4. Matching Microservice](#4-matching-microservice)
-  - [5. Notification Microservice](#5-notification-microservice)
-- [Environment Variables Reference](#-environment-variables-reference)
-- [API Reference](#-api-reference)
-- [Background Email Queue & Retry Worker](#-background-email-queue--retry-worker)
-- [Administration & CLI Utilities](#-administration--cli-utilities)
-- [Testing & Quality Assurance](#-testing--quality-assurance)
-- [Production Deployment](#-production-deployment)
-- [Security & Resilience Design](#-security--resilience-design)
-- [Author & Acknowledgements](#-author--acknowledgements)
-
----
-
-## 💡 Core Concepts & Highlights
+## Core Concepts and Highlights
 
 * **Time Banking Economy:** Every new user starts with **5 complimentary time credits**. Completing a 1-hour session transfers 1 credit from learner to mentor atomically via MongoDB ACID transactions.
 * **Microservices with Resilient Fallback:** Recommendation scoring runs in a dedicated Python Flask microservice. If the microservice is offline or sleeping, the Express API transparently falls back to an internal matching engine without service interruption.
-* **Durable Notification Architecture:** User-facing requests never block on external SMTP/API calls. Email jobs are stored in MongoDB with exponential backoff and dispatched via a secure Flask service leveraging the Resend API.
-* **Real-time In-App Notifications & Messaging:** Direct messaging is strictly gated to members with active bookings. In-app badge counters auto-refresh every 15 seconds or upon tab focus.
+* **Durable Notification Architecture:** User-facing requests never block on external email API calls. Email jobs are stored in MongoDB with exponential backoff and dispatched via a secure Flask service leveraging the Resend API.
+* **Real-time In-App Notifications and Messaging:** Direct messaging is strictly gated to members with active bookings. In-app badge counters auto-refresh every 15 seconds or upon tab focus.
 
 ---
 
-## ✨ Key Features
+## Key Features
 
-### 🔐 Authentication & Onboarding
+### Authentication and Onboarding
 - **Dual Authentication Modes:** Email/password registration and one-click Google OAuth 2.0 (Google Identity Services).
 - **Strict Email Hygiene:** Validates DNS MX records and rejects disposable/temporary email domains before creating an account.
 - **Session Revocation:** JWT-based sessions supporting server-side invalidation via `tokenVersion` increments upon logout.
 - **Interactive Onboarding:** First-time onboarding modal automatically guides new users to declare skills they want to learn and skills they can teach.
 
-### 🔍 Discovery & Smart Matching
+### Discovery and Smart Matching
 - **Member Directory:** Search members by name, city, skills offered, and skills wanted with real-time query filtering.
 - **Multi-Factor Recommendation Engine:**
   - `+1.0` score per matching wanted/offered skill.
@@ -83,68 +43,68 @@
   - `+0.25` bonus for matching geographical city locations.
 - **Community Reviews Modal:** Inspect member feedback, ratings, and testimonials before booking.
 
-### 📅 Booking Lifecycle & Idempotency
+### Booking Lifecycle and Idempotency
 - **Conflict Prevention:** Automated overlap validation prevents double-booking either participant's calendar.
-- **Idempotency Protection:** Clients send unique `Idempotency-Key` headers (`UUIDv4`) to prevent duplicate booking charges or requests.
-- **Session Status Progression:** `pending` ➔ `accepted` / `declined` ➔ `completed`.
+- **Idempotency Protection:** Clients send unique `Idempotency-Key` headers (UUIDv4) to prevent duplicate booking charges or requests.
+- **Session Status Progression:** `pending` -> `accepted` / `declined` -> `completed`.
 
-### 💳 Transactional Time Credits
+### Transactional Time Credits
 - **Zero-Sum Balance Transfers:** Requester pays 1 credit; provider earns 1 credit upon session completion.
 - **ACID Transactions:** Powered by a MongoDB Replica Set session; prevents partial states or negative credit balances.
 - **Ledger History:** Dedicated transaction ledger displaying full history of credits earned and spent.
 
-### 💬 Booking-Gated Messaging
+### Booking-Gated Messaging
 - **Contextual Communication:** Chat conversations are permitted only between members with accepted or completed bookings.
 - **Unread Counters:** Automatically marks messages and related notifications as read when opening a thread.
 
-### ⭐ Reviews & Reputation
+### Reviews and Reputation
 - **Verified Reviews Only:** Only booking participants can rate and review a completed exchange.
 - **Double-Review Prevention:** Unique compound database indices ensure only one review per participant per booking.
 - **Aggregated Ratings:** Real-time calculation of average ratings and total review counts per user.
 
-### 🛡️ Administrative Console
+### Administrative Console
 - **Platform Analytics:** Real-time counters for registered users, active accounts, completed swaps, pending requests, transactions, and reviews.
 - **Account Moderation:** One-click account suspension and reactivation.
 - **Content Moderation:** Immediate deletion of flagged or abusive reviews.
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 ### High-Level Architecture
 
 ```mermaid
 flowchart LR
     subgraph Clients
-        Browser[React 19 + Vite SPA]
-        GIS[Google Identity Services] --> Browser
+        Browser["React 19 and Vite SPA"]
+        GIS["Google Identity Services"] --> Browser
     end
 
     subgraph CoreBackend["Core Backend (Node.js / Express)"]
-        API[Express REST API :5000]
-        EmailWorker[In-Process Email Queue Worker]
+        API["Express REST API :5000"]
+        EmailWorker["In-Process Email Queue Worker"]
     end
 
     subgraph DataStore["Data Layer"]
-        MongoDB[(MongoDB 7 Replica Set)]
+        MongoDB[("MongoDB 7 Replica Set")]
     end
 
     subgraph Microservices["Microservices (Python / Flask)"]
-        MatchService[Matching Service :6000]
-        NotifyService[Notification Service :7000]
+        MatchService["Matching Service :6000"]
+        NotifyService["Notification Service :7000"]
     end
 
     subgraph External["External Services"]
-        Resend[Resend Email API]
+        Resend["Resend Email API"]
     end
 
-    Browser -->|REST + Bearer JWT| API
-    API -->|Mongoose Queries & ACID Transactions| MongoDB
+    Browser -->|REST and Bearer JWT| API
+    API -->|Mongoose Queries and ACID Transactions| MongoDB
     API -->|Candidate Snapshot POST /match| MatchService
-    MatchService -.->|Ranked Matches / Fallback| API
+    MatchService -.->|Ranked Matches or Fallback| API
 
     API -->|Enqueue EmailJob| MongoDB
-    EmailWorker -->|Poll & Claim Pending Jobs| MongoDB
+    EmailWorker -->|Poll and Claim Pending Jobs| MongoDB
     EmailWorker -->|HMAC Authorized POST /notify| NotifyService
     NotifyService -->|HTTPS API| Resend
 ```
@@ -153,49 +113,49 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    App[App Entry & Router] --> Shell[AppShell Navigation & Badge Polling]
-    App --> Routes[Application Routes]
+    App["App Entry and Router"] --> Shell["AppShell Navigation and Badge Polling"]
+    App --> Routes["Application Routes"]
 
-    Routes --> DashboardPage[Dashboard & Matches]
-    Routes --> BrowsePage[Browse & Discovery]
-    Routes --> BookingsPage[Booking Lifecycle]
-    Routes --> MessagesPage[Booking-Gated Chat]
-    Routes --> ProfilePage[Profile Studio & Availability]
-    Routes --> CreditsPage[Credit History Ledger]
-    Routes --> AdminPage[Admin Operations]
+    Routes --> DashboardPage["Dashboard and Matches"]
+    Routes --> BrowsePage["Browse and Discovery"]
+    Routes --> BookingsPage["Booking Lifecycle"]
+    Routes --> MessagesPage["Booking-Gated Chat"]
+    Routes --> ProfilePage["Profile Studio and Availability"]
+    Routes --> CreditsPage["Credit History Ledger"]
+    Routes --> AdminPage["Admin Operations"]
 
-    Shell --> ReduxAuth[Redux: authSlice]
-    Shell --> ReduxNotify[Redux: notificationSlice]
+    Shell --> ReduxAuth["Redux: authSlice"]
+    Shell --> ReduxNotify["Redux: notificationSlice"]
 
-    ReduxAuth <--> SessionStorage[(sessionStorage)]
-    Routes --> AxiosClient[Axios Interceptor Instance]
-    AxiosClient -->|Bearer Token Header| API[Express API]
+    ReduxAuth <--> SessionStorage[("sessionStorage")]
+    Routes --> AxiosClient["Axios Interceptor Instance"]
+    AxiosClient -->|Bearer Token Header| API["Express API"]
 ```
 
 ### Backend & Worker Pipeline
 
 ```mermaid
 flowchart TD
-    Req[Incoming HTTP Request] --> Sec[Security: Helmet, CORS, JSON Limit, Rate Limiter]
-    Sec --> RouteMatch{Route Handler}
+    Req["Incoming HTTP Request"] --> Sec["Security: Helmet, CORS, JSON Limit, Rate Limiter"]
+    Sec --> RouteMatch{"Route Handler"}
 
-    RouteMatch --> AuthMW[authMiddleware: JWT Verification & Status Check]
-    AuthMW --> Controller[Controller Logic]
+    RouteMatch --> AuthMW["authMiddleware: JWT Verification and Status Check"]
+    AuthMW --> Controller["Controller Logic"]
 
-    Controller --> DB[(MongoDB Replica Set)]
-    Controller --> LocalMatch[In-Process Fallback Matcher]
-    Controller -.-> RemoteMatch[Python Matching Service]
+    Controller --> DB[("MongoDB Replica Set")]
+    Controller --> LocalMatch["In-Process Fallback Matcher"]
+    Controller -.-> RemoteMatch["Python Matching Service"]
 
-    Controller --> InAppNotif[Write In-App Notification]
-    Controller --> EmailQueue[Create EmailJob in Mongo]
+    Controller --> InAppNotif["Write In-App Notification"]
+    Controller --> EmailQueue["Create EmailJob in Mongo"]
 
     subgraph BackgroundJob["Background Pipeline (every 5s)"]
-        Worker[Email Queue Worker] -->|Find and Lock Job| EmailQueue
-        Worker -->|POST /notify with X-Notification-Key| FlaskNotify[Flask Notification Service]
-        FlaskNotify -->|Format Template & Send| ResendAPI[Resend API]
-        FlaskNotify -- Success --> Worker
+        Worker["Email Queue Worker"] -->|Find and Lock Job| EmailQueue
+        Worker -->|POST /notify with X-Notification-Key| FlaskNotify["Flask Notification Service"]
+        FlaskNotify -->|Format Template and Send| ResendAPI["Resend API"]
+        FlaskNotify -->|Success| Worker
         Worker -->|Update Status: sent| EmailQueue
-        Worker -- Fail -->|Exponential Backoff / Dead Letter| EmailQueue
+        Worker -->|Retry with Backoff or Mark Dead| EmailQueue
     end
 ```
 
@@ -203,104 +163,104 @@ flowchart TD
 
 ```mermaid
 erDiagram
-    USER ||--o{ BOOKING : "requests (learner)"
-    USER ||--o{ BOOKING : "provides (mentor)"
-    USER ||--o{ REVIEW : "writes (reviewer)"
-    USER ||--o{ REVIEW : "receives (reviewee)"
-    USER ||--o{ MESSAGE : "sends"
-    USER ||--o{ MESSAGE : "receives"
-    USER ||--o{ NOTIFICATION : "owns"
-    USER ||--o{ TRANSACTION : "transfers from / to"
-    BOOKING ||--o| TRANSACTION : "generates upon completion"
-    BOOKING ||--o{ REVIEW : "evaluated by"
-    BOOKING ||--o{ MESSAGE : "optionally references"
+    USER ||--o{ BOOKING : requests
+    USER ||--o{ BOOKING : provides
+    USER ||--o{ REVIEW : writes
+    USER ||--o{ REVIEW : receives
+    USER ||--o{ MESSAGE : sends
+    USER ||--o{ MESSAGE : receives
+    USER ||--o{ NOTIFICATION : owns
+    USER ||--o{ TRANSACTION : transfers
+    BOOKING ||--o| TRANSACTION : generates
+    BOOKING ||--o{ REVIEW : evaluated
+    BOOKING ||--o{ MESSAGE : references
 
     USER {
-        ObjectId _id PK
+        ObjectId id PK
         string name
         string email UK
-        string password "optional for Google auth"
-        string authProvider "local | google"
-        string googleId "sparse UK"
-        string role "user | admin"
-        string status "active | suspended"
-        number creditBalance "default: 5"
+        string password
+        string authProvider
+        string googleId
+        string role
+        string status
+        number creditBalance
         string bio
         array skillsOffered
         array skillsWanted
-        object location "city, country, coordinates"
+        object location
         string timezone
-        array availability "day, start, end"
+        array availability
         number tokenVersion
         date createdAt
     }
 
     BOOKING {
-        ObjectId _id PK
+        ObjectId id PK
         ObjectId requester FK
         ObjectId provider FK
         string skill
         date proposedTime
-        number durationMinutes "15-480, default: 60"
-        string idempotencyKey "partial UK"
-        string status "pending | accepted | declined | completed"
+        number durationMinutes
+        string idempotencyKey
+        string status
         date createdAt
     }
 
     TRANSACTION {
-        ObjectId _id PK
+        ObjectId id PK
         ObjectId from FK
         ObjectId to FK
-        number amount "1 credit"
-        ObjectId booking FK, UK
+        number amount
+        ObjectId booking FK
         date createdAt
     }
 
     REVIEW {
-        ObjectId _id PK
+        ObjectId id PK
         ObjectId booking FK
         ObjectId reviewer FK
         ObjectId reviewee FK
-        number rating "1 to 5"
+        number rating
         string comment
         date createdAt
     }
 
     MESSAGE {
-        ObjectId _id PK
+        ObjectId id PK
         ObjectId sender FK
         ObjectId recipient FK
-        ObjectId booking FK "optional"
-        string body "max 2000 chars"
+        ObjectId booking FK
+        string body
         date readAt
         date createdAt
     }
 
     NOTIFICATION {
-        ObjectId _id PK
+        ObjectId id PK
         ObjectId userId FK
-        string type "booking | message | review | credit"
+        string type
         string message
         ObjectId relatedId
-        boolean read "default: false"
-        date createdAt "TTL 90 days"
+        boolean read
+        date createdAt
     }
 
     EMAIL_JOB {
-        ObjectId _id PK
-        string type "BOOKING_CREATED | ACCEPTED | DECLINED | COMPLETED"
+        ObjectId id PK
+        string type
         string recipientEmail
-        object data "actor, skill, time"
-        string status "pending | processing | sent | dead"
+        object data
+        string status
         number attempts
         date nextAttemptAt
         string lastError
         date sentAt
-        date expiresAt "TTL 30 days"
+        date expiresAt
     }
 ```
 
-### Booking & Credit Lifecycle
+### Booking and Credit Lifecycle
 
 ```mermaid
 sequenceDiagram
@@ -314,10 +274,10 @@ sequenceDiagram
     participant Notify as Flask Notify Service
     participant Resend as Resend API
 
-    Learner->>Client: Selects skill & date/time
+    Learner->>Client: Selects skill and date/time
     Client->>API: POST /api/bookings (Bearer JWT, Idempotency-Key)
-    API->>DB: Check schedule conflicts & create Booking (status: pending)
-    API->>DB: Create In-App Notification & insert EmailJob
+    API->>DB: Check schedule conflicts and create Booking (status: pending)
+    API->>DB: Create In-App Notification and insert EmailJob
     API-->>Client: 201 Created
     
     Worker->>DB: Poll and claim pending EmailJob
@@ -325,29 +285,29 @@ sequenceDiagram
     Notify->>Resend: Dispatch transactional email
     Resend-->>Notify: 200 OK
     Notify-->>Worker: { delivered: true }
-    Worker->>DB: Update EmailJob to status 'sent'
+    Worker->>DB: Update EmailJob to status sent
 
-    Mentor->>Client: Views booking & clicks "Accept"
-    Client->>API: PATCH /api/bookings/:id/status { status: 'accepted' }
-    API->>DB: Update status to 'accepted' & queue notification
+    Mentor->>Client: Views booking and clicks Accept
+    Client->>API: PATCH /api/bookings/:id/status { status: accepted }
+    API->>DB: Update status to accepted and queue notification
     API-->>Client: 200 OK
 
-    Note over Learner,Mentor: The 1-hour skill session takes place...
+    Note over Learner,Mentor: The 1-hour skill session takes place
 
-    Learner->>Client: Clicks "Complete Session"
+    Learner->>Client: Clicks Complete Session
     Client->>API: PATCH /api/bookings/:id/complete
     Note over API,DB: Begin MongoDB Multi-Document ACID Transaction
     API->>DB: Decrement Learner creditBalance (-1)
     API->>DB: Increment Mentor creditBalance (+1)
     API->>DB: Insert Transaction record
-    API->>DB: Mark Booking status 'completed'
+    API->>DB: Mark Booking status completed
     Note over API,DB: Commit Transaction
-    API->>DB: Queue in-app & email completion notifications
+    API->>DB: Queue in-app and email completion notifications
     API-->>Client: 200 OK (Credits transferred)
 
-    Learner->>Client: Submits 5-star review & feedback
+    Learner->>Client: Submits 5-star review and feedback
     Client->>API: POST /api/reviews { bookingId, rating, comment }
-    API->>DB: Store Review & notify Mentor
+    API->>DB: Store Review and notify Mentor
     API-->>Client: 201 Created
 ```
 
@@ -368,22 +328,22 @@ $$S = S_{\text{skills}} + S_{\text{availability}} + S_{\text{location}}$$
 
 ---
 
-## 💻 Technology Stack
+## Technology Stack
 
 | Layer | Technologies |
 |---|---|
-| **Frontend Web App** | **React 19**, **Vite 8**, **React Router 7**, **Redux Toolkit 2**, **Axios**, **@react-oauth/google** |
-| **Styling & UI** | Responsive CSS custom properties, SVG iconography, modal systems, skeleton loaders |
-| **Core API** | **Node.js 20+**, **Express 5**, **Mongoose 8**, **bcryptjs**, **jsonwebtoken**, **google-auth-library**, **helmet**, **express-rate-limit** |
-| **Database** | **MongoDB 7** (Replica Set required for multi-document ACID transactions) |
-| **Microservices** | **Python 3.11+**, **Flask 3.1**, **Gunicorn 23**, **Requests**, **python-dotenv** |
-| **Transactional Email**| **Resend REST API** with customizable template rendering |
-| **Testing** | **Jest 30**, **Supertest 7**, **mongodb-memory-server**, Python `unittest` |
-| **DevOps & Containers**| **Docker**, **Docker Compose**, **Nginx** (SPA routing), **GitHub Actions CI** |
+| **Frontend Web App** | React 19, Vite 8, React Router 7, Redux Toolkit 2, Axios, @react-oauth/google |
+| **Styling and UI** | Responsive CSS custom properties, SVG iconography, modal systems, skeleton loaders |
+| **Core API** | Node.js 20+, Express 5, Mongoose 8, bcryptjs, jsonwebtoken, google-auth-library, helmet, express-rate-limit |
+| **Database** | MongoDB 7 (Replica Set required for multi-document ACID transactions) |
+| **Microservices** | Python 3.11+, Flask 3.1, Gunicorn 23, Requests, python-dotenv |
+| **Transactional Email**| Resend REST API with customizable template rendering |
+| **Testing** | Jest 30, Supertest 7, mongodb-memory-server, Python unittest |
+| **DevOps and Containers**| Docker, Docker Compose, Nginx (SPA routing), GitHub Actions CI |
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```text
 skillswap/
@@ -398,7 +358,7 @@ skillswap/
 │   │   ├── components/                # AppShell, OnboardingModal, Icon, AuthLayout
 │   │   ├── pages/                     # Dashboard, Browse, Bookings, Messages, etc.
 │   │   ├── redux/                     # Auth slice, notification slice, store setup
-│   │   ├── App.jsx                    # Routing table & navigation guards
+│   │   ├── App.jsx                    # Routing table and navigation guards
 │   │   └── main.jsx                   # React root entrypoint
 │   ├── Dockerfile                     # Multi-stage production build (Node build -> Nginx)
 │   ├── nginx.conf                     # Nginx client routing configuration
@@ -409,7 +369,7 @@ skillswap/
 │   ├── models/                        # Mongoose schemas (User, Booking, Review, etc.)
 │   ├── routes/                        # Express route definitions
 │   ├── scripts/                       # Maintenance scripts (makeAdmin, migration)
-│   ├── services/                      # notificationService & email queue worker
+│   ├── services/                      # notificationService and email queue worker
 │   ├── tests/                         # Jest + Supertest integration test suites
 │   ├── app.js                         # Express app middleware and routing setup
 │   ├── server.js                      # DB connection, worker startup, graceful shutdown
@@ -430,7 +390,7 @@ skillswap/
 
 ---
 
-## 🚀 Quick Start with Docker Compose
+## Quick Start with Docker Compose
 
 The fastest way to spin up the entire SkillSwap ecosystem (Frontend, API, Matching, Notifications, and a MongoDB Replica Set) is with Docker Compose.
 
@@ -465,7 +425,7 @@ The services will automatically configure and become available at:
 
 ---
 
-## 🛠️ Manual Local Development
+## Manual Local Development
 
 If you prefer to run services individually without Docker, follow these instructions.
 
@@ -487,7 +447,7 @@ In `mongosh`:
 ```javascript
 rs.initiate()
 ```
-*(Alternatively, simply create a free cluster on MongoDB Atlas, which is a replica set by default).*
+*(Alternatively, create a free cluster on MongoDB Atlas, which is a replica set by default).*
 
 ---
 
@@ -590,7 +550,7 @@ Runs on [http://localhost:7000](http://localhost:7000).
 
 ---
 
-## 🔐 Environment Variables Reference
+## Environment Variables Reference
 
 ### Express API (`server/.env`)
 
@@ -629,11 +589,11 @@ Runs on [http://localhost:7000](http://localhost:7000).
 
 ---
 
-## 📡 API Reference
+## API Reference
 
 All routes except `/api/auth/register`, `/api/auth/login`, and `/api/auth/google` require an `Authorization: Bearer <JWT>` header.
 
-### 🔑 Authentication (`/api/auth`)
+### Authentication (`/api/auth`)
 *Rate limited to 20 requests per 15 minutes per IP.*
 
 | Method | Endpoint | Description | Request Body / Notes |
@@ -643,7 +603,7 @@ All routes except `/api/auth/register`, `/api/auth/login`, and `/api/auth/google
 | `POST` | `/api/auth/google` | Sign in or sign up via Google | `{ credential }` (Google ID Token) |
 | `POST` | `/api/auth/logout` | Revoke user token version | *Requires Bearer JWT* |
 
-### 👤 Users & Profiles (`/api/users`)
+### Users and Profiles (`/api/users`)
 
 | Method | Endpoint | Description | Request Body / Notes |
 |---|---|---|---|
@@ -653,7 +613,7 @@ All routes except `/api/auth/register`, `/api/auth/login`, and `/api/auth/google
 | `PUT` | `/api/users/me/skills` | Update offered/wanted skills | `{ skillsOffered: [], skillsWanted: [] }` |
 | `PUT` | `/api/users/me/profile` | Update bio, location, availability | `{ bio, timezone, location, availability }` |
 
-### 📅 Bookings (`/api/bookings`)
+### Bookings (`/api/bookings`)
 
 | Method | Endpoint | Description | Headers & Body |
 |---|---|---|---|
@@ -662,19 +622,19 @@ All routes except `/api/auth/register`, `/api/auth/login`, and `/api/auth/google
 | `PATCH`| `/api/bookings/:id/status` | Accept or decline request | `{ status: "accepted" \| "declined" }` |
 | `PATCH`| `/api/bookings/:id/complete` | Complete session & transfer credits | *Requester only. Executes ACID credit transaction.* |
 
-### 💳 Credits (`/api/credits`)
+### Credits (`/api/credits`)
 
 | Method | Endpoint | Description | Notes |
 |---|---|---|---|
 | `GET` | `/api/credits/history` | Get credit ledger history | Populates `from` and `to` participant details |
 
-### 🎯 Matches (`/api/matches`)
+### Matches (`/api/matches`)
 
 | Method | Endpoint | Description | Notes |
 |---|---|---|---|
 | `GET` | `/api/matches` | Get recommended user matches | Dispatches to Python microservice or local fallback |
 
-### ⭐ Reviews (`/api/reviews`)
+### Reviews (`/api/reviews`)
 
 | Method | Endpoint | Description | Request Body / Notes |
 |---|---|---|---|
@@ -682,7 +642,7 @@ All routes except `/api/auth/register`, `/api/auth/login`, and `/api/auth/google
 | `GET` | `/api/reviews/mine` | List booking IDs user reviewed | Returns array of string booking IDs |
 | `GET` | `/api/reviews/:userId` | Get user rating summary & list | Returns `{ averageRating, totalReviews, reviews }` |
 
-### 💬 Messages (`/api/messages`)
+### Messages (`/api/messages`)
 
 | Method | Endpoint | Description | Request Body / Notes |
 |---|---|---|---|
@@ -690,7 +650,7 @@ All routes except `/api/auth/register`, `/api/auth/login`, and `/api/auth/google
 | `GET` | `/api/messages/:userId` | Get conversation messages | Marks received messages as read |
 | `POST` | `/api/messages/:userId` | Send a direct message | `{ body: string, bookingId?: string }` |
 
-### 🔔 Notifications (`/api/notifications`)
+### Notifications (`/api/notifications`)
 
 | Method | Endpoint | Description | Request Body / Notes |
 |---|---|---|---|
@@ -699,7 +659,7 @@ All routes except `/api/auth/register`, `/api/auth/login`, and `/api/auth/google
 | `PATCH`| `/api/notifications/:id/read` | Mark single notification read | — |
 | `PATCH`| `/api/notifications/read` | Mark all notifications read | Optional `{ type: "booking" \| ... }` filter |
 
-### 🛡️ Administration (`/api/admin`)
+### Administration (`/api/admin`)
 *Requires `role: 'admin'` claim.*
 
 | Method | Endpoint | Description | Request Body / Notes |
@@ -709,7 +669,7 @@ All routes except `/api/auth/register`, `/api/auth/login`, and `/api/auth/google
 | `PATCH`| `/api/admin/users/:id/status`| Suspend or restore account | `{ status: "active" \| "suspended" }` |
 | `DELETE`| `/api/admin/reviews/:id` | Remove offensive review | Permanently deletes review document |
 
-### 🩺 Health Checks
+### Health Checks
 
 | Service | Method | Route | Description |
 |---|---|---|---|
@@ -719,7 +679,7 @@ All routes except `/api/auth/register`, `/api/auth/login`, and `/api/auth/google
 
 ---
 
-## 📬 Background Email Queue & Retry Worker
+## Background Email Queue and Retry Worker
 
 To guarantee high availability and sub-second response times on booking operations, emails are handled via a durable queue:
 
@@ -734,7 +694,7 @@ To guarantee high availability and sub-second response times on booking operatio
 
 ---
 
-## 🛠️ Administration & CLI Utilities
+## Administration and CLI Utilities
 
 ### Promote a User to Admin
 Grant full administrator access to any user by email:
@@ -753,7 +713,7 @@ npm run migrate:remove-email-verification
 
 ---
 
-## 🧪 Testing & Quality Assurance
+## Testing and Quality Assurance
 
 ### Run Backend Unit & Integration Tests
 Uses Jest with `mongodb-memory-server` to run real database queries in an isolated in-memory replica set:
@@ -785,7 +745,7 @@ docker compose config
 
 ---
 
-## 🚢 Production Deployment
+## Production Deployment
 
 ### 1. Frontend (Vercel)
 - **Framework Preset:** Vite
@@ -819,7 +779,7 @@ docker compose config
 
 ---
 
-## 🔒 Security & Resilience Design
+## Security and Resilience Design
 
 * **Timing-Safe Service Authentication:** Service-to-service communication between Express and the notification microservice utilizes `hmac.compare_digest` to prevent timing attacks.
 * **Token Invalidation on Logout:** User records feature a `tokenVersion`. Calling `/api/auth/logout` increments this counter, instantly invalidating all previously issued JWTs.
@@ -830,7 +790,7 @@ docker compose config
 
 ---
 
-## 👨‍💻 Author & Acknowledgements
+## Author and Acknowledgements
 
 Created and maintained by **Mahdi Hasan** ([@eeemrann](https://github.com/eeemrann)).
 
