@@ -56,8 +56,8 @@ function AppRoutes() {
 
   return <Routes>
     <Route path="/" element={<Landing />} />
-    <Route path="/login" element={<PublicAuthRoute><Login /></PublicAuthRoute>} />
-    <Route path="/register" element={<PublicAuthRoute><Register /></PublicAuthRoute>} />
+    <Route path="/login/*" element={<PublicAuthRoute><Login /></PublicAuthRoute>} />
+    <Route path="/register/*" element={<PublicAuthRoute><Register /></PublicAuthRoute>} />
     <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
     <Route path="/browse" element={<ProtectedRoute><Browse /></ProtectedRoute>} />
     <Route path="/bookings" element={<ProtectedRoute><Bookings /></ProtectedRoute>} />
