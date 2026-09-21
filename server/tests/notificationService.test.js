@@ -1,5 +1,6 @@
 jest.mock('axios');
 jest.mock('../models/Notification');
+jest.mock('../models/EmailJob');
 
 const axios = require('axios');
 const Notification = require('../models/Notification');
@@ -26,7 +27,7 @@ describe('notification service', () => {
     expect(axios.post).toHaveBeenCalledWith(
       'https://notifications.example.com/notify',
       expect.objectContaining({ recipientEmail: 'member@example.com' }),
-      expect.objectContaining({ timeout: 30000 })
+      expect.objectContaining({ timeout: 10000, headers: expect.any(Object) })
     );
     expect(result.delivered).toBe(true);
   });

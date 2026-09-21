@@ -27,7 +27,8 @@ exports.createReview = async (req, res) => {
     res.status(201).json(review);
   } catch (err) {
     if (err.code === 11000) return res.status(409).json({ message: 'You already reviewed this booking' });
-    res.status(400).json({ message: err.message || 'Review could not be created' });
+    console.error('Review creation failed:', err.message);
+    res.status(400).json({ message: 'Review could not be created' });
   }
 };
 
@@ -36,16 +37,19 @@ exports.getUserReviews = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(req.params.userId)) {
       return res.status(400).json({ message: 'Invalid user id' });
     }
-    const reviews = await Review.find({ reviewee: req.params.userId })
-      .populate('reviewer', 'name profilePicture')
-      .sort({ createdAt: -1 });
-    const totalReviews = reviews.length;
-    const averageRating = totalReviews
-      ? Number((reviews.reduce((sum, review) => sum + review.rating, 0) / totalReviews).toFixed(1))
-      : 0;
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const filter = { reviewee: req.params.userId };
+    const [reviews, summary] = await Promise.all([
+      Review.find(filter).populate('reviewer', 'name profilePicture').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit),
+      Review.aggregate([{ $match: { reviewee: new mongoose.Types.ObjectId(req.params.userId) } }, { $group: { _id: null, totalReviews: { $sum: 1 }, averageRating: { $avg: '$rating' } } }])
+    ]);
+    const totalReviews = summary[0]?.totalReviews || 0;
+    const averageRating = summary[0] ? Number(summary[0].averageRating.toFixed(1)) : 0;
     res.json({ averageRating, totalReviews, reviews });
   } catch (err) {
-    res.status(500).json({ message: 'Could not load reviews', error: err.message });
+    console.error('Review list failed:', err.message);
+    res.status(500).json({ message: 'Could not load reviews' });
   }
 };
 
@@ -54,6 +58,6 @@ exports.getMyReviewedBookings = async (req, res) => {
     const reviews = await Review.find({ reviewer: req.userId }).select('booking');
     res.json(reviews.map(r => r.booking.toString()));
   } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
+    res.status(500).json({ message: 'Reviewed bookings could not be loaded' });
   }
 };

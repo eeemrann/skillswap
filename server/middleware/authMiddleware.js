@@ -13,13 +13,16 @@ module.exports = async function (req, res, next) {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.userId).select('role status');
+    const user = await User.findById(decoded.userId).select('role status +tokenVersion');
     if (!user) {
       return res.status(401).json({ message: 'Invalid or expired token' });
     }
 
     if (user.status === 'suspended') {
       return res.status(403).json({ message: 'This account has been suspended' });
+    }
+    if ((decoded.tokenVersion || 0) !== (user.tokenVersion || 0)) {
+      return res.status(401).json({ message: 'Invalid or expired token' });
     }
 
     req.userId = user._id.toString();

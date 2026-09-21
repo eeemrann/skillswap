@@ -1,11 +1,9 @@
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  // No default keeps accounts created before email verification backward-compatible.
-  // New local and Google registrations set this explicitly.
-  emailVerified: { type: Boolean },
+  name: { type: String, required: true, trim: true, maxlength: 80 },
+  email: { type: String, required: true, unique: true, lowercase: true, trim: true, maxlength: 254 },
+  emailVerified: { type: Boolean, default: false },
   emailVerificationCodeHash: { type: String, select: false },
   emailVerificationExpires: { type: Date, select: false },
   password: { type: String, required: function () { return this.authProvider !== 'google'; } }, // hashed; optional for Google-only accounts
@@ -14,9 +12,10 @@ const userSchema = new mongoose.Schema({
   profilePicture: { type: String, default: '' },
   role: { type: String, enum: ['user', 'admin'], default: 'user' },
   status: { type: String, enum: ['active', 'suspended'], default: 'active' },
+  tokenVersion: { type: Number, default: 0, select: false },
   bio: { type: String, maxlength: 500, default: '' },
-  skillsOffered: [{ type: String }],   // e.g. ["Guitar", "Excel"]
-  skillsWanted: [{ type: String }],    // e.g. ["Cooking", "Spanish"]
+  skillsOffered: [{ type: String, trim: true, maxlength: 80 }],
+  skillsWanted: [{ type: String, trim: true, maxlength: 80 }],
   location: {
     city: { type: String, default: '' },
     country: { type: String, default: '' },

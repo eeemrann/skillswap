@@ -5,7 +5,7 @@ const { login, verifyEmail } = require('../controllers/authController');
 
 jest.mock('bcryptjs');
 jest.mock('../models/User');
-jest.mock('../services/notificationService', () => ({ notify: jest.fn() }));
+jest.mock('../services/notificationService', () => ({ queueEmail: jest.fn() }));
 
 function response() {
   return { status: jest.fn().mockReturnThis(), json: jest.fn() };
@@ -15,7 +15,7 @@ describe('local email verification', () => {
   afterEach(() => jest.clearAllMocks());
 
   test('blocks a new unverified account after validating its password', async () => {
-    User.findOne.mockResolvedValue({ email: 'member@example.com', password: 'hash', emailVerified: false });
+    User.findOne.mockReturnValue({ select: jest.fn().mockResolvedValue({ email: 'member@example.com', password: 'hash', emailVerified: false, save: jest.fn() }) });
     bcrypt.compare.mockResolvedValue(true);
     const res = response();
     await login({ body: { email: ' MEMBER@example.com ', password: 'password123' } }, res);

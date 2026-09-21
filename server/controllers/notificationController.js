@@ -3,12 +3,16 @@ const Notification = require('../models/Notification');
 
 exports.getNotifications = async (req, res) => {
   try {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
+    const page = Math.max(Number(req.query.page) || 1, 1);
     const notifications = await Notification.find({ userId: req.userId })
       .sort({ createdAt: -1 })
-      .limit(100);
+      .skip((page - 1) * limit)
+      .limit(limit);
     res.json(notifications);
   } catch (error) {
-    res.status(500).json({ message: 'Could not load notifications', error: error.message });
+    console.error('Notification list failed:', error.message);
+    res.status(500).json({ message: 'Could not load notifications' });
   }
 };
 
@@ -22,7 +26,8 @@ exports.getUnreadCounts = async (req, res) => {
     grouped.forEach(({ _id, count }) => { counts[_id] = count; counts.all += count; });
     res.json(counts);
   } catch (error) {
-    res.status(500).json({ message: 'Could not load notification counts', error: error.message });
+    console.error('Notification count failed:', error.message);
+    res.status(500).json({ message: 'Could not load notification counts' });
   }
 };
 
@@ -36,7 +41,7 @@ exports.markNotificationRead = async (req, res) => {
     if (!notification) return res.status(404).json({ message: 'Notification not found' });
     res.json(notification);
   } catch (error) {
-    res.status(400).json({ message: 'Could not update notification', error: error.message });
+    res.status(400).json({ message: 'Could not update notification' });
   }
 };
 
@@ -47,6 +52,6 @@ exports.markNotificationsRead = async (req, res) => {
     const result = await Notification.updateMany(filter, { read: true });
     res.json({ updated: result.modifiedCount });
   } catch (error) {
-    res.status(400).json({ message: 'Could not update notifications', error: error.message });
+    res.status(400).json({ message: 'Could not update notifications' });
   }
 };

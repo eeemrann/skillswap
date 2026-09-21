@@ -22,7 +22,7 @@ jobs:
         with:
           node-version: 20
 
-      - run: npm install
+      - run: npm ci
 
       - run: npm test
 
@@ -41,7 +41,7 @@ jobs:
         with:
           node-version: 22
 
-      - run: npm install
+      - run: npm ci
 
       - run: npm run lint
 
@@ -64,7 +64,7 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      - run: python -c "import app"
+      - run: python -m unittest -v
 
   notification-service-check:
     runs-on: ubuntu-latest
@@ -82,7 +82,7 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      - run: python -c "import app"
+      - run: python -m unittest -v
 
   docker-compose-check:
     runs-on: ubuntu-latest

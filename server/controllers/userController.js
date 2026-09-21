@@ -1,6 +1,16 @@
 const mongoose = require('mongoose');
 const User = require('../models/User');
 
+const cleanSkills = (value) => {
+  if (!Array.isArray(value)) return [];
+  const unique = new Map();
+  value.forEach((skill) => {
+    const cleaned = typeof skill === 'string' ? skill.trim() : '';
+    if (cleaned && cleaned.length <= 80) unique.set(cleaned.toLowerCase(), cleaned);
+  });
+  return [...unique.values()].slice(0, 25);
+};
+
 // GET the logged-in user's own profile
 exports.getProfile = async (req, res) => {
   try {
@@ -8,30 +18,25 @@ exports.getProfile = async (req, res) => {
     if (!user) return res.status(404).json({ message: 'User not found' });
     res.json(user);
   } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
+    res.status(500).json({ message: 'Profile could not be loaded' });
   }
 };
 
 // UPDATE the logged-in user's skills
 exports.updateSkills = async (req, res) => {
   try {
-    const sanitize = (arr) =>
-      Array.isArray(arr)
-        ? arr.filter((s) => typeof s === 'string' && s.trim().length > 0).map((s) => s.trim())
-        : [];
-
-    const skillsOffered = sanitize(req.body.skillsOffered);
-    const skillsWanted = sanitize(req.body.skillsWanted);
+    const skillsOffered = cleanSkills(req.body.skillsOffered);
+    const skillsWanted = cleanSkills(req.body.skillsWanted);
 
     const user = await User.findByIdAndUpdate(
       req.userId,
       { skillsOffered, skillsWanted },
-      { new: true }
+      { new: true, runValidators: true }
     ).select('-password');
 
     res.json(user);
   } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
+    res.status(500).json({ message: 'Skills could not be updated' });
   }
 };
 
@@ -59,13 +64,15 @@ exports.updateProfile = async (req, res) => {
 
     res.json(user);
   } catch (err) {
-    res.status(400).json({ message: err.message || 'Profile update failed' });
+    res.status(400).json({ message: 'Profile update failed' });
   }
 };
 
 // GET all other users (for browsing skills) — excludes the logged-in user and passwords
 exports.getAllUsers = async (req, res) => {
   try {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
+    const page = Math.max(Number(req.query.page) || 1, 1);
     const users = await User.aggregate([
       { $match: { _id: { $ne: new mongoose.Types.ObjectId(req.userId) }, status: { $ne: 'suspended' } } },
       {
@@ -90,10 +97,31 @@ exports.getAllUsers = async (req, res) => {
           location: 1, timezone: 1, availability: 1,
           averageRating: 1, reviewCount: 1
         }
-      }
+      },
+      { $sort: { createdAt: -1 } },
+      { $skip: (page - 1) * limit },
+      { $limit: limit }
     ]);
     res.json(users);
   } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
+    res.status(500).json({ message: 'Users could not be loaded' });
+  }
+};
+
+exports.updateCompleteProfile = async (req, res) => {
+  try {
+    const { bio, timezone, location, availability } = req.body;
+    const cleanAvailability = Array.isArray(availability) ? availability.filter((slot) => slot?.day && slot?.start && slot?.end).slice(0, 30) : [];
+    if (cleanAvailability.some((slot) => slot.start >= slot.end)) return res.status(400).json({ message: 'Availability end time must be after start time' });
+    const user = await User.findByIdAndUpdate(req.userId, {
+      skillsOffered: cleanSkills(req.body.skillsOffered), skillsWanted: cleanSkills(req.body.skillsWanted),
+      bio: typeof bio === 'string' ? bio.trim() : '',
+      timezone: typeof timezone === 'string' && timezone.length <= 100 ? timezone.trim() : 'UTC',
+      location: { city: typeof location?.city === 'string' ? location.city.trim().slice(0, 100) : '', country: typeof location?.country === 'string' ? location.country.trim().slice(0, 100) : '' },
+      availability: cleanAvailability
+    }, { new: true, runValidators: true }).select('-password');
+    return res.json(user);
+  } catch (error) {
+    return res.status(400).json({ message: 'Profile update failed' });
   }
 };

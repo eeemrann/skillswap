@@ -6,8 +6,7 @@ const normalizeSkills = (skills = []) => new Set(
 );
 
 const hasAvailabilityOverlap = (first = [], second = []) => {
-  const slots = new Set(first.map((slot) => `${slot.day}|${slot.start}|${slot.end}`));
-  return second.some((slot) => slots.has(`${slot.day}|${slot.start}|${slot.end}`));
+  return first.some((a) => second.some((b) => a.day === b.day && a.start < b.end && b.start < a.end));
 };
 
 const hasLocationOverlap = (first = {}, second = {}) => {
@@ -58,7 +57,7 @@ exports.getMatches = async (req, res) => {
 
     const matchingServiceTimeoutMs = Number(process.env.MATCHING_SERVICE_TIMEOUT_MS || 60000);
 
-    if (!me.skillsWanted?.length || !me.skillsOffered?.length || !candidates.length) return res.json([]);
+    if (!me.skillsWanted?.length || !candidates.length) return res.json([]);
 
     try {
       const response = await axios.post(`${matchingServiceUrl}/match`, {
@@ -75,6 +74,7 @@ exports.getMatches = async (req, res) => {
       return res.json(matchLocally(me, candidates));
     }
   } catch (err) {
-    res.status(500).json({ message: 'Could not load recommendations', error: err.message });
+    console.error('Recommendations failed:', err.message);
+    res.status(500).json({ message: 'Could not load recommendations' });
   }
 };

@@ -1,6 +1,7 @@
 import os
 import smtplib
 import ssl
+import hmac
 from email.message import EmailMessage
 from flask import Flask, jsonify, request
 from dotenv import load_dotenv
@@ -8,6 +9,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
+
+def authorized(req):
+    expected = os.getenv('NOTIFICATION_SERVICE_API_KEY', '')
+    supplied = req.headers.get('X-Notification-Key', '')
+    return bool(expected) and hmac.compare_digest(expected, supplied)
 
 TEMPLATES = {
     'EMAIL_VERIFICATION': ('Verify your SkillSwap email', 'Hi {actor},\n\nYour SkillSwap verification code is {code}. It expires in {minutes} minutes.\n\nIf you did not create this account, you can ignore this email.'),
@@ -23,6 +29,8 @@ def health():
 
 @app.post('/notify')
 def notify():
+    if not authorized(request):
+        return jsonify({'message': 'Unauthorized'}), 401
     payload = request.get_json(silent=True) or {}
     event_type = payload.get('type')
     recipient = payload.get('recipientEmail')
@@ -68,7 +76,7 @@ def notify():
         return jsonify({'delivered': True})
     except (smtplib.SMTPException, OSError) as error:
         app.logger.exception('SMTP delivery failed: type=%s recipient=%s', event_type, recipient)
-        return jsonify({'delivered': False, 'message': str(error)}), 502
+        return jsonify({'delivered': False, 'message': 'Email provider rejected the delivery'}), 502
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.getenv('PORT', '7000')))

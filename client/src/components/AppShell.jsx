@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../redux/authSlice';
 import { clearNotifications, fetchUnreadCounts } from '../redux/notificationSlice';
 import Icon from './Icon';
+import api from '../api/axios';
 
 const links = [
   { to: '/dashboard', label: 'Overview', icon: 'home' },
@@ -29,9 +30,12 @@ function AppShell({ children, eyebrow, title, description, action }) {
   const navLinks = user?.role === 'admin' ? [...links, { to: '/admin', label: 'Admin', icon: 'settings' }] : links;
 
   useEffect(() => {
-    dispatch(fetchUnreadCounts());
-    const timer = window.setInterval(() => dispatch(fetchUnreadCounts()), 30000);
-    return () => window.clearInterval(timer);
+    const refresh = () => { if (!document.hidden) dispatch(fetchUnreadCounts()); };
+    refresh();
+    const timer = window.setInterval(refresh, 15000);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => { window.clearInterval(timer); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); };
   }, [dispatch]);
 
   useEffect(() => {
@@ -46,7 +50,7 @@ function AppShell({ children, eyebrow, title, description, action }) {
     };
   }, [menuOpen]);
 
-  const handleLogout = () => { dispatch(clearNotifications()); dispatch(logout()); navigate('/'); };
+  const handleLogout = async () => { try { await api.post('/auth/logout'); } catch { /* clear the browser session even if the API is unavailable */ } dispatch(clearNotifications()); dispatch(logout()); navigate('/'); };
   const badgeFor = (path) => path === '/dashboard'
     ? notificationCounts.all
     : path === '/bookings' ? notificationCounts.booking

@@ -51,9 +51,9 @@ def match():
     return jsonify(results)
 
 def availability_score(first, second):
-    first_slots = {(slot.get('day'), slot.get('start'), slot.get('end')) for slot in first if isinstance(slot, dict)}
-    second_slots = {(slot.get('day'), slot.get('start'), slot.get('end')) for slot in second if isinstance(slot, dict)}
-    return bool(first_slots.intersection(second_slots))
+    first_slots = [slot for slot in first if isinstance(slot, dict)]
+    second_slots = [slot for slot in second if isinstance(slot, dict)]
+    return any(a.get('day') == b.get('day') and a.get('start', '') < b.get('end', '') and b.get('start', '') < a.get('end', '') for a in first_slots for b in second_slots)
 
 def location_match(first, second):
     first_city = str(first.get('city', '')).strip().lower()

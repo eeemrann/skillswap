@@ -7,10 +7,12 @@ exports.getHistory = async (req, res) => {
     })
       .populate('from', 'name')
       .populate('to', 'name')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .limit(Math.min(Math.max(Number(req.query.limit) || 50, 1), 100));
 
     res.json(transactions);
   } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
+    console.error('Credit history failed:', err.message);
+    res.status(500).json({ message: 'Credit history could not be loaded' });
   }
 };

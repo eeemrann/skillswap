@@ -4,11 +4,28 @@ const User = require('../models/User');
 const validator = require('validator');
 const { OAuth2Client } = require('google-auth-library');
 const crypto = require('crypto');
-const { notify } = require('../services/notificationService');
+const dns = require('dns').promises;
+const { queueEmail } = require('../services/notificationService');
 
 const googleClient = new OAuth2Client();
 const VERIFICATION_TTL_MS = 10 * 60 * 1000;
 const normalizeEmail = (email = '') => String(email).trim().toLowerCase();
+const DISPOSABLE_DOMAINS = new Set(['mailinator.com', 'guerrillamail.com', '10minutemail.com', 'tempmail.com', 'yopmail.com', 'throwawaymail.com']);
+const validateDeliverableEmail = async (email) => {
+  if (!validator.isEmail(email, { allow_utf8_local_part: false })) return false;
+  const domain = email.split('@')[1];
+  const configured = String(process.env.BLOCKED_EMAIL_DOMAINS || '').split(',').map((item) => item.trim().toLowerCase()).filter(Boolean);
+  if (DISPOSABLE_DOMAINS.has(domain) || configured.includes(domain)) return false;
+  try {
+    const records = await Promise.race([
+      dns.resolveMx(domain),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('DNS timeout')), 3000))
+    ]);
+    return records.length > 0;
+  } catch (_) {
+    return false;
+  }
+};
 const hashVerificationCode = (code) => crypto.createHash('sha256').update(code).digest('hex');
 const issueVerificationCode = (user) => {
   const code = crypto.randomInt(100000, 1000000).toString();
@@ -17,9 +34,9 @@ const issueVerificationCode = (user) => {
   return code;
 };
 const createToken = (user) => jwt.sign(
-  { userId: user._id, role: user.role || 'user' },
+  { userId: user._id, role: user.role || 'user', tokenVersion: user.tokenVersion || 0 },
   process.env.JWT_SECRET,
-  { expiresIn: '7d' }
+  { expiresIn: process.env.JWT_EXPIRES_IN || '1h' }
 );
 
 const publicUser = (user) => ({
@@ -36,11 +53,14 @@ exports.register = async (req, res) => {
     const { name, password } = req.body;
     const email = normalizeEmail(req.body.email);
 
-    if (!validator.isEmail(email)) {
-      return res.status(400).json({ message: 'Invalid email format' });
+    if (!await validateDeliverableEmail(email)) {
+      return res.status(400).json({ message: 'Use a valid, deliverable email address. Temporary email services are not allowed.' });
     }
-    if (!password || password.length < 8) {
-      return res.status(400).json({ message: 'Password must be at least 8 characters' });
+    if (!name || !String(name).trim() || String(name).trim().length > 80) {
+      return res.status(400).json({ message: 'Name is required and must be 80 characters or fewer' });
+    }
+    if (!password || password.length < 8 || Buffer.byteLength(password) > 72) {
+      return res.status(400).json({ message: 'Password must be 8 to 72 bytes long' });
     }
 
     // Check if user already exists
@@ -56,21 +76,22 @@ exports.register = async (req, res) => {
     const verificationCode = issueVerificationCode(newUser);
     await newUser.save();
 
-    const delivery = await notify('EMAIL_VERIFICATION', newUser.email, {
+    const queued = await queueEmail('EMAIL_VERIFICATION', newUser.email, {
       actor: newUser.name,
       code: verificationCode,
       minutes: Math.floor(VERIFICATION_TTL_MS / 60000)
     });
 
     res.status(201).json({
-      message: delivery.delivered
+      message: queued
         ? 'Account created. Check your email for the verification code.'
-        : 'Account created, but the verification email could not be delivered. Please resend the code.',
+        : 'Account created, but the verification email could not be queued. Please resend the code.',
       requiresVerification: true,
       email: newUser.email
     });
   } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
+    console.error('Authentication request failed:', err.message);
+    res.status(500).json({ message: 'Authentication request could not be completed' });
   }
 };
 
@@ -80,7 +101,7 @@ exports.login = async (req, res) => {
     const { password } = req.body;
     const email = normalizeEmail(req.body.email);
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).select('+emailVerificationCodeHash +emailVerificationExpires +tokenVersion');
     if (!user) {
       return res.status(400).json({ message: 'Invalid email or password' });
     }
@@ -94,9 +115,12 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: 'Invalid email or password' });
     }
 
-    // Older accounts predate email verification and have this field undefined.
-    // Only accounts explicitly registered as unverified are blocked.
-    if (user.emailVerified === false) {
+    if (user.emailVerified !== true) {
+      if (!user.emailVerificationExpires || user.emailVerificationExpires <= new Date()) {
+        const code = issueVerificationCode(user);
+        await user.save();
+        await queueEmail('EMAIL_VERIFICATION', user.email, { actor: user.name, code, minutes: Math.floor(VERIFICATION_TTL_MS / 60000) });
+      }
       return res.status(403).json({ message: 'Verify your email before signing in', requiresVerification: true, email: user.email });
     }
 
@@ -108,7 +132,8 @@ exports.login = async (req, res) => {
 
     res.json({ token, user: publicUser(user) });
   } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
+    console.error('Authentication request failed:', err.message);
+    res.status(500).json({ message: 'Authentication request could not be completed' });
   }
 };
 
@@ -153,7 +178,8 @@ exports.googleLogin = async (req, res) => {
     const token = createToken(user);
     return res.json({ token, user: publicUser(user) });
   } catch (err) {
-    return res.status(401).json({ message: 'Google sign-in failed. Please try again.', error: err.message });
+    console.error('Google sign-in failed:', err.message);
+    return res.status(401).json({ message: 'Google sign-in failed. Please try again.' });
   }
 };
 
@@ -178,7 +204,8 @@ exports.verifyEmail = async (req, res) => {
     await user.save();
     return res.json({ message: 'Email verified successfully. You can now sign in.' });
   } catch (err) {
-    return res.status(500).json({ message: 'Email verification failed', error: err.message });
+    console.error('Email verification failed:', err.message);
+    return res.status(500).json({ message: 'Email verification failed' });
   }
 };
 
@@ -192,14 +219,20 @@ exports.resendVerification = async (req, res) => {
     }
     const code = issueVerificationCode(user);
     await user.save();
-    const delivery = await notify('EMAIL_VERIFICATION', user.email, {
+    const queued = await queueEmail('EMAIL_VERIFICATION', user.email, {
       actor: user.name,
       code,
       minutes: Math.floor(VERIFICATION_TTL_MS / 60000)
     });
-    if (!delivery.delivered) return res.status(502).json({ message: 'Verification email could not be delivered. Please try again.' });
+    if (!queued) return res.status(503).json({ message: 'Verification email could not be queued. Please try again.' });
     return res.json({ message: 'A new verification code was sent.' });
   } catch (err) {
-    return res.status(500).json({ message: 'Could not resend verification email', error: err.message });
+    console.error('Verification resend failed:', err.message);
+    return res.status(500).json({ message: 'Could not resend verification email' });
   }
+};
+
+exports.logout = async (req, res) => {
+  await User.findByIdAndUpdate(req.userId, { $inc: { tokenVersion: 1 } });
+  return res.json({ message: 'Signed out successfully' });
 };

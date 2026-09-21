@@ -59,7 +59,7 @@ flowchart TB
     API -->|"Mongoose: application data and in-app notifications"| Mongo
     API -->|"Candidate snapshot"| Match
     Match -->|"Ranked matches"| API
-    API -->|"Verification and booking email payloads"| Email
+    API -->|"Authenticated queued email delivery"| Email
     Email -->|"STARTTLS or SSL"| SMTP
     SMTP -->|"Email delivery"| Inbox
 ```
@@ -68,9 +68,9 @@ flowchart TB
 
 | Component | Owns | Does not own |
 |---|---|---|
-| React SPA | Routing, forms, local page state, auth state, notification state, feedback, 30-second unread polling | Business authorization, direct database access, email delivery |
-| Express API | Authentication, authorization, validation, booking workflow, credit transaction, messages, reviews, notification persistence, admin operations | Rendering the SPA, SMTP transport |
-| MongoDB | Users, bookings, transactions, messages, reviews, and in-app notifications | Matching calculations or email delivery |
+| React SPA | Routing, forms, local page state, auth state, notification state, feedback, unread polling | Business authorization, direct database access, email delivery |
+| Express API | Authentication, authorization, validation, booking workflow, credit transaction, messages, reviews, notification persistence, durable email queue, admin operations | Rendering the SPA, SMTP transport |
+| MongoDB | Users, bookings, transactions, messages, reviews, in-app notifications, and retryable email jobs | Matching calculations or SMTP transport |
 | Matching service | Stateless scoring of candidates supplied by the API | User authentication or database access |
 | Notification service | Email-verification and booking templates plus SMTP transport | In-app notifications or booking persistence |
 
@@ -89,7 +89,7 @@ flowchart TD
     Auth["Redux auth slice"]
     Notices["Redux notification slice"]
     Axios["Axios API client"]
-    Storage[("localStorage")]
+    Storage[("sessionStorage")]
 
     Router --> Pages
     Pages --> Shell
@@ -105,7 +105,7 @@ flowchart TD
 
 Redux is deliberately limited to cross-page state:
 
-- `authSlice`: user and JWT, persisted to `localStorage`
+- `authSlice`: user and short-lived JWT, persisted to `sessionStorage`
 - `notificationSlice`: recent notifications and unread counts
 
 Bookings, reviews, conversations, transactions, matches, and profile forms use component-local state because they are currently page-scoped.
@@ -248,7 +248,7 @@ sequenceDiagram
     API-->>UI: Refreshed credit balance
 ```
 
-Email failure is logged and returned internally as `delivered: false`; it does not roll back a booking that was already stored. The notification service URL is normalized before `/notify` is appended, so a configured trailing slash is safe.
+Email is stored as a durable MongoDB job during the application request. A worker retries transient failures with exponential backoff and records terminal failures for diagnosis. The Flask endpoint requires a shared service key, and a trailing slash in the configured URL remains safe.
 
 ### Reviews
 
@@ -422,18 +422,24 @@ The frontend is exposed at `http://localhost:8080`; API, matching, and notificat
 | Variable | Required | Purpose | Production value/example |
 |---|---:|---|---|
 | `MONGO_URI` | Yes | MongoDB connection string | Atlas replica-set URI |
-| `JWT_SECRET` | Yes | Signs seven-day JWTs | Long random secret |
+| `JWT_SECRET` | Yes | Signs short-lived JWTs | Long random secret |
 | `GOOGLE_CLIENT_ID` | For Google login | Server-side token audience | Google web client ID |
 | `PORT` | Yes | Express listener | Render supplies this |
 | `MATCHING_SERVICE_URL` | No | Remote matcher; local fallback exists | `https://skillswap-vmma.onrender.com` |
 | `MATCHING_SERVICE_TIMEOUT_MS` | No | Matcher timeout | `60000` |
 | `NOTIFICATION_SERVICE_URL` | For booking email | Email microservice base URL | `https://skillswap-2-vtzd.onrender.com/` |
 | `NOTIFICATION_SERVICE_TIMEOUT_MS` | No | Email service timeout | `30000` |
+| `NOTIFICATION_SERVICE_API_KEY` | Yes | Shared secret for authenticated email-service calls | random long value |
+| `CLIENT_ORIGINS` | Yes in production | Comma-separated browser origins allowed by CORS | `https://your-app.vercel.app` |
+| `TRUST_PROXY_HOPS` | No | Trusted reverse-proxy hop count | `1` |
+| `JWT_EXPIRES_IN` | No | JWT lifetime | `1h` |
 
 The production main API must have this exact relationship configured:
 
 ```env
 NOTIFICATION_SERVICE_URL=https://skillswap-2-vtzd.onrender.com/
+NOTIFICATION_SERVICE_API_KEY=use-the-same-random-value-on-both-services
+CLIENT_ORIGINS=https://skillswap-rho-five.vercel.app
 ```
 
 Do not append `/notify`; the Node service adds that path itself.
@@ -449,6 +455,7 @@ Do not append `/notify`; the Node service adds that path itself.
 | `SMTP_USER` | Yes | SMTP login |
 | `SMTP_PASSWORD` | Yes | SMTP password or provider app password |
 | `EMAIL_FROM` | Yes | Sender header, for example `SkillSwap <mail@example.com>` |
+| `NOTIFICATION_SERVICE_API_KEY` | Yes | Must exactly match the main API shared secret |
 
 For Gmail, use a Google app password rather than the account password.
 
@@ -599,14 +606,14 @@ The GitHub Actions workflow currently:
 
 - Root directory: `notification-service`
 - Public URL: `https://skillswap-2-vtzd.onrender.com/`
-- Use the included Dockerfile and configure every SMTP variable on this service.
+- Use the included Gunicorn Dockerfile and configure every SMTP variable plus `NOTIFICATION_SERVICE_API_KEY` on this service.
 - Configure the main API's `NOTIFICATION_SERVICE_URL` to this public URL.
 
 ## Security behavior
 
 - Passwords are hashed with bcrypt using 10 salt rounds.
 - New local accounts must prove inbox ownership with a hashed, six-digit verification code that expires after 10 minutes.
-- JWTs expire after seven days.
+- JWTs expire after one hour by default and are revoked server-side when the user signs out.
 - Protected requests reload user status and role from MongoDB.
 - Suspended users are rejected by the authentication middleware.
 - Admin authorization is enforced server-side.
@@ -616,7 +623,7 @@ The GitHub Actions workflow currently:
 
 ## Current limitations
 
-- Notifications use 30-second polling rather than WebSockets or server-sent events.
+- Notifications use 15-second visibility-aware polling rather than WebSockets or server-sent events.
 - Email delivery is synchronous with a bounded timeout and has no durable retry queue.
 - The matching service is intentionally simple and has an in-process fallback.
 - Browse, notifications, bookings, messages, and reviews do not yet have pagination.

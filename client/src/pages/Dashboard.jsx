@@ -17,15 +17,17 @@ function Dashboard() {
   const [matches, setMatches] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     if (!token) return undefined;
     let active = true;
-    api.get('/users/me').then((res) => { if (active) dispatch(setCredentials({ user: res.data, token })); }).catch(() => {});
+    api.get('/users/me').then((res) => { if (active) dispatch(setCredentials({ user: res.data, token })); }).catch(() => { if (active) setLoadError('Your profile could not be refreshed.'); });
     Promise.allSettled([api.get('/matches'), api.get('/bookings')]).then(([matchResult, bookingResult]) => {
       if (!active) return;
       setMatches(matchResult.status === 'fulfilled' ? matchResult.value.data : []);
       if (bookingResult.status === 'fulfilled') setBookings(bookingResult.value.data);
+      if (matchResult.status === 'rejected' || bookingResult.status === 'rejected') setLoadError('Some dashboard information could not be loaded. Please refresh to try again.');
       setLoading(false);
     });
     dispatch(fetchNotifications());
@@ -38,6 +40,7 @@ function Dashboard() {
 
   return (
     <AppShell eyebrow="Workspace overview" title={`Welcome back, ${user?.name?.split(' ')[0] || 'there'}.`} description="Everything you need to keep learning, teaching, and building momentum." action={<Link className="primary-button" to="/browse">Explore skills <Icon name="arrow" size={16}/></Link>}>
+      {loadError && <p className="status-message error" role="alert">{loadError}</p>}
       <div className="content-grid dashboard-grid">
         <div className="stat-row">
           <div className="stat-card"><small>Available credits</small><strong>{user?.creditBalance ?? 0} <em>hours</em></strong></div>

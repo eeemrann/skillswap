@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useSearchParams } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import api from '../api/axios';
-import { fetchUnreadCounts, markNotificationTypeRead } from '../redux/notificationSlice';
+import { fetchUnreadCounts } from '../redux/notificationSlice';
 
 function Messages() {
   const currentUser = useSelector((state) => state.auth.user);
@@ -26,7 +26,6 @@ function Messages() {
   }, [userId]);
 
   useEffect(() => {
-    dispatch(markNotificationTypeRead('message'));
     let active = true;
     api.get('/bookings').then((res) => {
       if (!active) return;
@@ -41,17 +40,17 @@ function Messages() {
     }).catch((err) => { if (active) setMessage(err.response?.data?.message || 'Could not load your booking connections.'); })
       .finally(() => { if (active) setLoadingConnections(false); });
     return () => { active = false; };
-  }, [currentUser?._id, currentUser?.id, dispatch]);
+  }, [currentUser?._id, currentUser?.id]);
 
   useEffect(() => {
     if (!userId) return undefined;
     let active = true;
     queueMicrotask(() => { if (active) setLoadingMessages(true); });
-    api.get(`/messages/${userId}`).then((res) => { if (active) { setMessages(res.data); setMessage(''); } })
+    api.get(`/messages/${userId}`).then((res) => { if (active) { setMessages(res.data); setMessage(''); dispatch(fetchUnreadCounts()); } })
       .catch((err) => { if (active) setMessage(err.response?.data?.message || 'Could not load messages.'); })
       .finally(() => { if (active) setLoadingMessages(false); });
     return () => { active = false; };
-  }, [userId]);
+  }, [userId, dispatch]);
 
   const sendMessage = async (event) => {
     event.preventDefault(); const cleanBody = body.trim(); if (!cleanBody) return;
