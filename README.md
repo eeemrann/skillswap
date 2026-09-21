@@ -15,7 +15,7 @@ Render services may need time to wake after inactivity.
 
 ## Features
 
-- Immediate email/password registration with no verification-code step
+- Immediate email/password registration
 - Google authentication and JWT-protected APIs
 - Profiles containing offered and wanted skills, biography, location, timezone, and availability
 - Skill discovery with average ratings and detailed reviews
