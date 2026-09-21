@@ -15,7 +15,7 @@ SkillSwap is a peer-to-peer learning platform where people teach skills, learn f
 
 ## Features
 
-- Verified email/password registration and Google authentication with JWT authorization
+- Immediate email/password registration and Google authentication with JWT authorization
 - Profiles with skills offered, skills wanted, location, timezone, availability, and bio
 - Community browsing with ratings and detailed reviews
 - Skill recommendations based on skill overlap, availability, and location
@@ -72,12 +72,12 @@ flowchart TB
 | Express API | Authentication, authorization, validation, booking workflow, credit transaction, messages, reviews, notification persistence, durable email queue, admin operations | Rendering the SPA, SMTP transport |
 | MongoDB | Users, bookings, transactions, messages, reviews, in-app notifications, and retryable email jobs | Matching calculations or SMTP transport |
 | Matching service | Stateless scoring of candidates supplied by the API | User authentication or database access |
-| Notification service | Email-verification and booking templates plus SMTP transport | In-app notifications or booking persistence |
+| Notification service | Booking-event email templates and provider transport | In-app notifications or booking persistence |
 
 The two notification concepts are intentionally separate:
 
 - **In-app notifications** are MongoDB documents created by the Express API and displayed by the React application.
-- **Email notifications** are account-verification and booking-event messages sent by the Flask notification service through SMTP.
+- **Email notifications** are booking-event messages sent by the Flask notification service through the configured email provider.
 
 ### Frontend architecture
 
@@ -159,7 +159,6 @@ erDiagram
     USER {
         ObjectId id
         string email
-        boolean emailVerified
         string role
         string status
         number creditBalance
@@ -479,8 +478,6 @@ All routes except registration/login are JWT-protected unless stated otherwise.
 | `POST` | `/api/auth/register` | Register with email/password |
 | `POST` | `/api/auth/login` | Login and receive a JWT |
 | `POST` | `/api/auth/google` | Verify a Google ID token and login/register |
-| `POST` | `/api/auth/verify-email` | Verify a new local account with its six-digit code |
-| `POST` | `/api/auth/resend-verification` | Issue and email a replacement verification code |
 
 Authentication routes are limited to 20 requests per 15 minutes.
 
@@ -555,7 +552,7 @@ These routes require `role: admin`.
 | Notification | `GET` | `/` | Health response |
 | Notification | `POST` | `/notify` | Render and send a supported booking email |
 
-Supported email event types are `EMAIL_VERIFICATION`, `BOOKING_CREATED`, `BOOKING_ACCEPTED`, `BOOKING_DECLINED`, and `BOOKING_COMPLETED`.
+Supported email event types are `BOOKING_CREATED`, `BOOKING_ACCEPTED`, `BOOKING_DECLINED`, and `BOOKING_COMPLETED`.
 
 ## Testing and CI
 
@@ -612,7 +609,7 @@ The GitHub Actions workflow currently:
 ## Security behavior
 
 - Passwords are hashed with bcrypt using 10 salt rounds.
-- New local accounts must prove inbox ownership with a hashed, six-digit verification code that expires after 10 minutes.
+- Local registration creates an authenticated session immediately after the address and password pass validation.
 - JWTs expire after one hour by default and are revoked server-side when the user signs out.
 - Protected requests reload user status and role from MongoDB.
 - Suspended users are rejected by the authentication middleware.

@@ -16,14 +16,6 @@ def authorized(req):
 
 
 TEMPLATES = {
-    "EMAIL_VERIFICATION": (
-        "Verify your SkillSwap email",
-        "Hi {actor},\n\n"
-        "Your SkillSwap verification code is {code}. "
-        "It expires in {minutes} minutes.\n\n"
-        "If you did not create this account, you can ignore this email."
-    ),
-
     "BOOKING_CREATED": (
         "New SkillSwap request",
         "{actor} requested a {skill} exchange for {time}."

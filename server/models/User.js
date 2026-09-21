@@ -3,9 +3,6 @@ const mongoose = require('mongoose');
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true, maxlength: 80 },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true, maxlength: 254 },
-  emailVerified: { type: Boolean, default: false },
-  emailVerificationCodeHash: { type: String, select: false },
-  emailVerificationExpires: { type: Date, select: false },
   password: { type: String, required: function () { return this.authProvider !== 'google'; } }, // hashed; optional for Google-only accounts
   authProvider: { type: String, enum: ['local', 'google'], default: 'local' },
   googleId: { type: String, unique: true, sparse: true },
