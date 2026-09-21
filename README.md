@@ -1,6 +1,6 @@
 # SkillSwap
 
-SkillSwap is a peer-to-peer learning platform where people teach skills, learn from one another, and exchange time credits instead of money. It includes profiles, skill discovery, matching, bookings, messaging, reviews, credit transfers, email delivery, in-app notifications, and administration tools.
+SkillSwap is a peer-to-peer learning platform where members teach skills, learn from one another, and exchange time credits instead of money.
 
 ## Live services
 
@@ -11,133 +11,95 @@ SkillSwap is a peer-to-peer learning platform where people teach skills, learn f
 | Matching service | [skillswap-vmma.onrender.com](https://skillswap-vmma.onrender.com) | Render |
 | Notification service | [skillswap-2-vtzd.onrender.com](https://skillswap-2-vtzd.onrender.com/) | Render |
 
-> Render free-tier services can take 30–60 seconds to wake after inactivity. The API uses longer downstream timeouts and has a local matching fallback, but the first request can still be slower than normal.
+Render services may need time to wake after inactivity.
 
 ## Features
 
-- Immediate email/password registration and Google authentication with JWT authorization
-- Profiles with skills offered, skills wanted, location, timezone, availability, and bio
-- Community browsing with ratings and detailed reviews
-- Skill recommendations based on skill overlap, availability, and location
-- Booking lifecycle: pending → accepted/declined → completed
-- Atomic one-credit transfer when an accepted booking is completed
-- Messaging between users who have an accepted or completed booking
-- Reviews from either participant after a completed booking
-- Persisted in-app notifications with unread badges
-- Booking email notifications through a separate SMTP service
-- Admin statistics, account suspension, and review removal APIs
+- Immediate email/password registration with no verification-code step
+- Google authentication and JWT-protected APIs
+- Profiles containing offered and wanted skills, biography, location, timezone, and availability
+- Skill discovery with average ratings and detailed reviews
+- Remote matching with a local fallback
+- Booking lifecycle: `pending` → `accepted` or `declined` → `completed`
+- Transactional time-credit transfers
+- Messaging between accepted or completed booking participants
+- In-app booking, message, review, and credit notifications
+- Booking-event emails through a protected notification service and Resend
+- Administrative statistics, account suspension, and review removal
 - Docker Compose development environment and GitHub Actions CI
 
 ## Architecture
 
-SkillSwap uses a browser SPA, a single authenticated application API, MongoDB, and two small Python services. The Express API is the system boundary for the browser: the frontend never calls MongoDB, the matching service, the notification service, or SMTP directly.
+The React application communicates only with the Express API. The API owns authentication and business rules, persists application state in MongoDB, calls the optional matching service, and queues email jobs for the notification service.
 
-### System context
+### System architecture
 
 ```mermaid
-flowchart TB
-    User["User"]
+flowchart LR
+    User[User] --> Web[React and Vite SPA]
+    Google[Google Identity Services] --> Web
+    Web -->|REST with Bearer JWT| API[Node.js and Express API]
 
-    subgraph Browser["Browser - assets served by Vercel"]
-        SPA["React SPA<br/>Vite, React Router, Redux Toolkit, Axios"]
-    end
+    API -->|Mongoose| Mongo[(MongoDB)]
+    API -->|Candidate snapshot| Match[Flask matching service]
+    Match -->|Ranked matches| API
 
-    subgraph Render["Render - backend services"]
-        API["Express API<br/>Authentication and business rules"]
-        Match["Flask matching service<br/>POST /match"]
-        Email["Flask notification service<br/>POST /notify<br/>skillswap-2-vtzd.onrender.com"]
-    end
-
-    Mongo[("MongoDB Atlas")]
-    Google["Google Identity Services"]
-    SMTP["SMTP provider"]
-    Inbox["Recipient inbox"]
-
-    User --> SPA
-    Google -->|"Google ID token"| SPA
-    SPA -->|"REST API and Bearer JWT"| API
-    API -->|"Mongoose: application data and in-app notifications"| Mongo
-    API -->|"Candidate snapshot"| Match
-    Match -->|"Ranked matches"| API
-    API -->|"Authenticated queued email delivery"| Email
-    Email -->|"STARTTLS or SSL"| SMTP
-    SMTP -->|"Email delivery"| Inbox
+    API -->|Create EmailJob| Mongo
+    Worker[Email queue worker] -->|Read and retry EmailJob| Mongo
+    Worker -->|Authenticated POST /notify| Notify[Flask notification service]
+    Notify -->|HTTPS API| Resend[Resend]
+    Resend --> Inbox[Recipient inbox]
 ```
-
-### Responsibilities and boundaries
-
-| Component | Owns | Does not own |
-|---|---|---|
-| React SPA | Routing, forms, local page state, auth state, notification state, feedback, unread polling | Business authorization, direct database access, email delivery |
-| Express API | Authentication, authorization, validation, booking workflow, credit transaction, messages, reviews, notification persistence, durable email queue, admin operations | Rendering the SPA, SMTP transport |
-| MongoDB | Users, bookings, transactions, messages, reviews, in-app notifications, and retryable email jobs | Matching calculations or SMTP transport |
-| Matching service | Stateless scoring of candidates supplied by the API | User authentication or database access |
-| Notification service | Booking-event email templates and provider transport | In-app notifications or booking persistence |
-
-The two notification concepts are intentionally separate:
-
-- **In-app notifications** are MongoDB documents created by the Express API and displayed by the React application.
-- **Email notifications** are booking-event messages sent by the Flask notification service through the configured email provider.
 
 ### Frontend architecture
 
 ```mermaid
 flowchart TD
-    Router["React Router"]
-    Pages["Page components"]
-    Shell["AppShell navigation"]
-    Auth["Redux auth slice"]
-    Notices["Redux notification slice"]
-    Axios["Axios API client"]
-    Storage[("sessionStorage")]
-
-    Router --> Pages
-    Pages --> Shell
-    Pages --> Auth
-    Shell --> Notices
-    Pages --> Notices
-    Pages --> Axios
-    Notices --> Axios
-    Auth <--> Storage
-    Storage -->|"JWT read by request interceptor"| Axios
-    Axios -->|"Authorization: Bearer JWT"| Backend["Express API"]
+    Router[React Router] --> Pages[Page components]
+    Pages --> Shell[AppShell navigation]
+    Pages --> Auth[Redux auth slice]
+    Shell --> Notices[Redux notification slice]
+    Pages --> APIClient[Axios API client]
+    Notices --> APIClient
+    Auth <--> Session[(sessionStorage)]
+    Session --> APIClient
+    APIClient --> Backend[Express API]
 ```
 
-Redux is deliberately limited to cross-page state:
-
-- `authSlice`: user and short-lived JWT, persisted to `sessionStorage`
-- `notificationSlice`: recent notifications and unread counts
-
-Bookings, reviews, conversations, transactions, matches, and profile forms use component-local state because they are currently page-scoped.
+Redux is used for cross-page authentication and notification state. Bookings, messages, reviews, profiles, transactions, and recommendations use page-local state.
 
 ### Backend architecture
 
 ```mermaid
 flowchart TD
-    Request["HTTP request"]
-    Middleware["JSON and CORS middleware"]
-    Routes["Express routes<br/>Auth rate limit or JWT/admin checks as applicable"]
-    Controllers["Controllers and business rules"]
-    Models["Mongoose models"]
-    DB[("MongoDB")]
-    Notifications["notificationService.js"]
-    Match["Flask matching service"]
-    Fallback["Local matching fallback"]
-    Email["Flask notification service"]
+    Request[HTTP request] --> Security[Helmet, CORS, JSON limits, rate limits]
+    Security --> Routes[Express routes]
+    Routes --> Auth[JWT and admin middleware]
+    Auth --> Controllers[Controllers and business rules]
+    Controllers --> Models[Mongoose models]
+    Models --> Database[(MongoDB)]
 
-    Request --> Middleware
-    Middleware --> Routes
-    Routes --> Controllers
-    Controllers --> Models
-    Models --> DB
-    Controllers --> Notifications
-    Notifications -->|"Persist in-app activity"| Models
-    Notifications -->|"Request email delivery"| Email
-    Controllers -->|"matchController HTTP request"| Match
-    Controllers -->|"Matching timeout or failure"| Fallback
+    Controllers --> InApp[In-app notification persistence]
+    Controllers --> Queue[Durable email queue]
+    Queue --> EmailWorker[Background email worker]
+    EmailWorker --> EmailService[Notification service]
+
+    Controllers --> Matcher[Matching service]
+    Controllers --> Fallback[Local matching fallback]
 ```
 
-The API is assembled in `server/app.js`; `server/server.js` connects Mongoose and starts the HTTP listener. Protected routes run `authMiddleware`, which verifies the JWT and reloads the current role/status from MongoDB so suspended accounts and role changes take effect without issuing a new token.
+`server/app.js` configures middleware and routes. `server/server.js` connects MongoDB, starts the email worker, starts the HTTP listener, and handles graceful shutdown.
+
+### Component responsibilities
+
+| Component | Responsibility |
+|---|---|
+| React SPA | Routing, forms, page feedback, auth state, notification badges, and API requests |
+| Express API | Authentication, authorization, validation, bookings, credits, messages, reviews, notifications, and administration |
+| MongoDB | Users, bookings, transactions, reviews, messages, in-app notifications, and email jobs |
+| Matching service | Stateless skill, availability, and location scoring |
+| Notification service | Booking-email templates and Resend delivery |
+| Email worker | Durable delivery attempts, exponential backoff, and terminal-failure logging |
 
 ### Data model
 
@@ -151,10 +113,8 @@ erDiagram
     USER ||--o{ REVIEW : receives
     USER ||--o{ MESSAGE : sends
     USER ||--o{ MESSAGE : receives
+    BOOKING o|--o{ MESSAGE : links
     USER ||--o{ NOTIFICATION : receives
-    USER ||--o{ TRANSACTION : pays
-    USER ||--o{ TRANSACTION : earns
-    BOOKING o|--o{ MESSAGE : optionally_links
 
     USER {
         ObjectId id
@@ -170,6 +130,8 @@ erDiagram
         ObjectId provider
         string skill
         date proposedTime
+        number durationMinutes
+        string idempotencyKey
         string status
     }
     TRANSACTION {
@@ -200,135 +162,97 @@ erDiagram
         boolean read
         date createdAt
     }
+    EMAIL_JOB {
+        string type
+        string recipientEmail
+        string status
+        number attempts
+        date nextAttemptAt
+    }
 ```
 
-Important constraints:
+## Important workflows
 
-- A user cannot book themselves.
-- Only the provider can accept or decline a pending booking.
-- Only the requester can complete an accepted booking.
-- Completion moves one credit from requester to provider in a MongoDB transaction.
-- Messaging requires an accepted or completed booking between both users.
-- A participant can review a completed booking once; `{ booking, reviewer }` is unique.
-- Notification types are `booking`, `message`, `review`, and `credit`.
+### Registration and login
 
-## End-to-end flows
+1. The browser sends an email and password to `/api/auth/register`.
+2. The API validates the email syntax, mail domain, disposable-domain policy, name, and password length.
+3. The password is hashed with bcrypt and the user is stored.
+4. The API immediately returns a JWT and public user data.
+5. The frontend stores the session in `sessionStorage` and opens the dashboard.
 
-### Booking, credits, and notifications
+There is no email verification code or verification gate.
+
+### Booking and email notifications
 
 ```mermaid
 sequenceDiagram
     participant UI as React UI
     participant API as Express API
     participant DB as MongoDB
+    participant Worker as Email worker
     participant NS as Notification service
-    participant SMTP as SMTP provider
+    participant Provider as Resend
 
-    UI->>API: POST /api/bookings + JWT
-    API->>DB: Validate users and save pending booking
-    API->>DB: Save provider in-app notification
-    API->>NS: POST /notify (BOOKING_CREATED)
-    NS->>SMTP: Send email
-    NS-->>API: delivered true/false
-    API-->>UI: 201 booking
-
-    UI->>API: PATCH /api/bookings/:id/status
-    API->>DB: Atomically update pending booking
-    API->>DB: Save requester notification
-    API->>NS: Send accepted/declined email
-    API-->>UI: Updated booking
-
-    UI->>API: PATCH /api/bookings/:id/complete
-    API->>DB: Transaction: balances + ledger + completed status
-    API->>DB: Save booking and credit notifications
-    API->>NS: Send completion email
-    API-->>UI: Completed booking
-    UI->>API: GET /api/users/me
-    API-->>UI: Refreshed credit balance
+    UI->>API: POST /api/bookings with JWT and Idempotency-Key
+    API->>DB: Validate conflicts and save booking
+    API->>DB: Save in-app notification and EmailJob
+    API-->>UI: 201 Created
+    Worker->>DB: Claim pending EmailJob
+    Worker->>NS: POST /notify with X-Notification-Key
+    NS->>Provider: POST email payload
+    Provider-->>NS: Delivery accepted
+    NS-->>Worker: delivered true
+    Worker->>DB: Mark EmailJob sent
 ```
 
-Email is stored as a durable MongoDB job during the application request. A worker retries transient failures with exponential backoff and records terminal failures for diagnosis. The Flask endpoint requires a shared service key, and a trailing slash in the configured URL remains safe.
+Failed email jobs are retried with exponential backoff. Booking requests do not wait for the external email provider.
+
+### Booking completion and credits
+
+Booking completion runs in a MongoDB transaction. It verifies the requester, booking status, and credit balance; subtracts one credit from the requester; adds one to the provider; writes a unique transaction record; and marks the booking completed.
+
+MongoDB must run as a replica set for this transaction.
 
 ### Reviews
 
-```mermaid
-sequenceDiagram
-    participant UI as Bookings / Discover UI
-    participant API as Express API
-    participant DB as MongoDB
+Only booking participants can review a completed booking. A `{ booking, reviewer }` unique constraint prevents duplicate reviews. Review responses include:
 
-    UI->>API: POST /api/reviews
-    API->>DB: Verify completed booking and participant
-    API->>DB: Insert unique review
-    API->>DB: Insert review notification
-    API-->>UI: 201 review
+- Average rating
+- Total review count
+- Rating
+- Comment
+- Reviewer name and profile picture
+- Review date
 
-    UI->>API: GET /api/reviews/:userId
-    API->>DB: Find reviews and populate reviewer
-    API-->>UI: averageRating, totalReviews, reviews[]
-    UI->>UI: Render summary, stars, comments, names, dates
-```
+### Messages and unread notifications
 
-### Messages and unread activity
+Messages require an accepted or completed booking relationship. If a message includes a booking ID, the API verifies that the booking belongs to both conversation participants. Opening a conversation marks its incoming messages and their related notifications as read.
 
-```mermaid
-sequenceDiagram
-    participant UI as Messages UI
-    participant API as Express API
-    participant DB as MongoDB
+The application refreshes notification counts every 15 seconds while visible and when the window regains focus.
 
-    UI->>API: POST /api/messages/:userId
-    API->>DB: Verify booking connection
-    API->>DB: Save message
-    API->>DB: Save recipient notification
-    API-->>UI: 201 message
+### Matching
 
-    UI->>API: GET /api/messages/:userId
-    API->>DB: Mark incoming messages read
-    API-->>UI: Conversation
+Candidates receive:
 
-    loop Every 30 seconds while app shell is mounted
-        UI->>API: GET /api/notifications/unread-count
-        API-->>UI: Total and per-type counts
-    end
-```
+- `+1` for every wanted skill they offer
+- `+0.25` when availability ranges overlap on the same day
+- `+0.25` when both members have the same city
 
-This is polling, not WebSocket-based real-time delivery.
-
-### Matching and fallback
-
-The Express API loads the current user and candidate profiles from MongoDB, then sends a reduced snapshot to `POST /match`. The Flask service is stateless and scores:
-
-1. `+1` for each wanted skill offered by a candidate
-2. `+0.25` for an identical availability slot
-3. `+0.25` for the same city
-
-If the matching service is unavailable or times out, the Express controller runs the same scoring logic locally and still returns recommendations.
+If the Python service fails or times out, the Express API uses the equivalent local matcher.
 
 ## Repository structure
 
 ```text
 skillswap/
-├── client/                       React/Vite SPA
-│   ├── src/api/axios.js          API base URL and JWT interceptors
-│   ├── src/components/           Shell, auth layout, onboarding, icons
-│   ├── src/pages/                Route-level UI
-│   ├── src/redux/                Auth and notification slices
-│   ├── Dockerfile                Vite build + Nginx runtime
-│   └── vercel.json               SPA rewrite configuration
-├── server/                       Express application API
-│   ├── controllers/              Business workflows
-│   ├── middleware/               JWT and admin authorization
-│   ├── models/                   Mongoose schemas
-│   ├── routes/                   REST route definitions
-│   ├── services/                 Downstream notification adapter
-│   ├── tests/                    Jest controller/service tests
-│   ├── app.js                    Express composition
-│   └── server.js                 Mongo connection and listener
-├── matching-service/             Stateless Flask matcher
-├── notification-service/         Flask SMTP delivery service
-├── .github/workflows/ci.yml      CI checks
-└── docker-compose.yml            Local multi-service environment
+├── client/                 React, Vite, Redux, and Nginx configuration
+├── server/                 Express API, Mongoose models, tests, and scripts
+├── matching-service/       Stateless Flask recommendation service
+├── notification-service/   Flask and Resend email service
+├── .github/workflows/      Continuous-integration workflow
+├── docker-compose.yml      Local multi-service environment
+├── CODEBASE.txt            Generated source-code bundle
+└── README.md
 ```
 
 ## Technology stack
@@ -336,26 +260,45 @@ skillswap/
 | Layer | Technology |
 |---|---|
 | Frontend | React 19, React Router 7, Redux Toolkit, Axios, Vite 8 |
-| Main API | Node.js, Express 5, Mongoose 8 |
-| Database | MongoDB / MongoDB Atlas |
+| API | Node.js, Express 5, Mongoose 8 |
+| Database | MongoDB or MongoDB Atlas |
 | Authentication | JWT, bcryptjs, Google Identity Services |
-| Matching | Python 3.11, Flask, Gunicorn |
-| Email delivery | Python 3.11, Flask, `smtplib`, SMTP STARTTLS/SSL |
-| Testing | Jest with controller and service mocks |
+| Matching | Python, Flask, Gunicorn |
+| Email | Python, Flask, Requests, Resend |
+| Testing | Jest, Supertest, Python unittest, ESLint, Vite build |
 | Deployment | Vercel, Render, Docker, Nginx |
 
 ## Local development
 
 ### Prerequisites
 
-- Node.js 20+
-- Python 3.11+
-- MongoDB replica set or MongoDB Atlas
-- Docker and Docker Compose if using containers
+- Node.js 20 or newer
+- Python 3.11 or newer
+- Docker and Docker Compose, or a MongoDB replica set
+- A Resend API key for real email delivery
 
-MongoDB transactions require a replica set. A standalone local MongoDB instance can serve most endpoints, but booking completion will fail unless transactions are supported. MongoDB Atlas supports the required transaction behavior.
+### Docker Compose
 
-### 1. Main API
+Create a root `.env`, then run:
+
+```bash
+docker compose up --build
+```
+
+Local endpoints:
+
+| Service | URL |
+|---|---|
+| Frontend | `http://localhost:8080` |
+| API | `http://localhost:5000` |
+| Matching | `http://localhost:6000` |
+| Notification | `http://localhost:7000` |
+
+Docker Compose starts MongoDB as a single-node replica set so booking-completion transactions work locally.
+
+### Run services individually
+
+Main API:
 
 ```bash
 cd server
@@ -364,9 +307,16 @@ cp .env.example .env
 npm run dev
 ```
 
-Runs at `http://localhost:5000`.
+Frontend:
 
-### 2. Matching service
+```bash
+cd client
+npm install
+cp .env.example .env.local
+npm run dev
+```
+
+Python services:
 
 ```bash
 cd matching-service
@@ -377,107 +327,83 @@ pip install -r requirements.txt
 python app.py
 ```
 
-Runs at `http://localhost:6000`.
-
-### 3. Notification service
-
-```bash
-cd notification-service
-python -m venv venv
-# Windows: venv\Scripts\activate
-# macOS/Linux: source venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-python app.py
-```
-
-Runs at `http://localhost:7000`.
-
-### 4. Frontend
-
-```bash
-cd client
-npm install
-cp .env.example .env.local
-npm run dev
-```
-
-Runs at `http://localhost:5173`.
-
-### Docker Compose
-
-Create a root `.env` containing the shared variables, then run:
-
-```bash
-docker compose up --build
-```
-
-The frontend is exposed at `http://localhost:8080`; API, matching, and notification services are exposed on ports `5000`, `6000`, and `7000`.
+Repeat from `notification-service`, including copying `.env.example` to `.env`.
 
 ## Environment variables
 
-### Express API (`server/.env` or Render main API)
-
-| Variable | Required | Purpose | Production value/example |
-|---|---:|---|---|
-| `MONGO_URI` | Yes | MongoDB connection string | Atlas replica-set URI |
-| `JWT_SECRET` | Yes | Signs short-lived JWTs | Long random secret |
-| `GOOGLE_CLIENT_ID` | For Google login | Server-side token audience | Google web client ID |
-| `PORT` | Yes | Express listener | Render supplies this |
-| `MATCHING_SERVICE_URL` | No | Remote matcher; local fallback exists | `https://skillswap-vmma.onrender.com` |
-| `MATCHING_SERVICE_TIMEOUT_MS` | No | Matcher timeout | `60000` |
-| `NOTIFICATION_SERVICE_URL` | For booking email | Email microservice base URL | `https://skillswap-2-vtzd.onrender.com/` |
-| `NOTIFICATION_SERVICE_TIMEOUT_MS` | No | Email service timeout | `30000` |
-| `NOTIFICATION_SERVICE_API_KEY` | Yes | Shared secret for authenticated email-service calls | random long value |
-| `CLIENT_ORIGINS` | Yes in production | Comma-separated browser origins allowed by CORS | `https://your-app.vercel.app` |
-| `TRUST_PROXY_HOPS` | No | Trusted reverse-proxy hop count | `1` |
-| `JWT_EXPIRES_IN` | No | JWT lifetime | `1h` |
-
-The production main API must have this exact relationship configured:
-
-```env
-NOTIFICATION_SERVICE_URL=https://skillswap-2-vtzd.onrender.com/
-NOTIFICATION_SERVICE_API_KEY=use-the-same-random-value-on-both-services
-CLIENT_ORIGINS=https://skillswap-rho-five.vercel.app
-```
-
-Do not append `/notify`; the Node service adds that path itself.
-
-### Notification service (Render)
+### Express API
 
 | Variable | Required | Purpose |
 |---|---:|---|
-| `PORT` | Render supplies it | Flask listener |
-| `SMTP_HOST` | Yes | SMTP server hostname |
-| `SMTP_PORT` | Yes | Usually `587` for STARTTLS or `465` for SSL |
-| `SMTP_SECURE` | Yes | `starttls`, `ssl`, or another value for plain SMTP |
-| `SMTP_USER` | Yes | SMTP login |
-| `SMTP_PASSWORD` | Yes | SMTP password or provider app password |
-| `EMAIL_FROM` | Yes | Sender header, for example `SkillSwap <mail@example.com>` |
-| `NOTIFICATION_SERVICE_API_KEY` | Yes | Must exactly match the main API shared secret |
+| `MONGO_URI` | Yes | MongoDB replica-set or Atlas connection string |
+| `JWT_SECRET` | Yes | JWT signing secret |
+| `JWT_EXPIRES_IN` | No | JWT lifetime; defaults to `1h` |
+| `GOOGLE_CLIENT_ID` | For Google login | Expected Google token audience |
+| `PORT` | No | HTTP port; defaults to `5000` |
+| `MATCHING_SERVICE_URL` | No | Matching-service base URL |
+| `MATCHING_SERVICE_TIMEOUT_MS` | No | Matching request timeout |
+| `NOTIFICATION_SERVICE_URL` | For booking email | Notification-service base URL |
+| `NOTIFICATION_SERVICE_TIMEOUT_MS` | No | Email-service request timeout |
+| `NOTIFICATION_SERVICE_API_KEY` | For booking email | Shared service-to-service secret |
+| `CLIENT_ORIGINS` | Recommended | Comma-separated CORS origins |
+| `TRUST_PROXY_HOPS` | On Render | Trusted reverse-proxy count; use `1` |
+| `BLOCKED_EMAIL_DOMAINS` | No | Additional comma-separated disposable domains |
 
-For Gmail, use a Google app password rather than the account password.
+Production example:
 
-### Frontend (Vercel build variables)
+```env
+NOTIFICATION_SERVICE_URL=https://skillswap-2-vtzd.onrender.com/
+NOTIFICATION_SERVICE_API_KEY=replace-with-a-long-random-shared-secret
+CLIENT_ORIGINS=https://skillswap-rho-five.vercel.app
+TRUST_PROXY_HOPS=1
+```
 
-| Variable | Required | Purpose | Production value |
-|---|---:|---|---|
-| `VITE_API_URL` | Recommended | API base URL embedded at build time | `https://skillswap-1-x54c.onrender.com/api` |
-| `VITE_GOOGLE_CLIENT_ID` | For Google login | Browser Google OAuth client ID | Google web client ID |
+Do not append `/notify` to `NOTIFICATION_SERVICE_URL`; the API adds it.
 
-Vite variables are compiled into the bundle. Redeploy the frontend after changing them.
+### Notification service
+
+| Variable | Required | Purpose |
+|---|---:|---|
+| `PORT` | No | Flask/Gunicorn port; Render supplies it |
+| `RESEND_API_KEY` | Yes | Resend API credential |
+| `EMAIL_FROM` | Yes | Resend-verified sender address |
+| `NOTIFICATION_SERVICE_API_KEY` | Yes | Must match the Express API value |
+
+Example:
+
+```env
+RESEND_API_KEY=re_replace_with_real_key
+EMAIL_FROM=SkillSwap <notifications@your-verified-domain.com>
+NOTIFICATION_SERVICE_API_KEY=replace-with-the-same-shared-secret
+```
+
+### Frontend
+
+| Variable | Required | Purpose |
+|---|---:|---|
+| `VITE_API_URL` | Recommended | API URL embedded during the Vite build |
+| `VITE_GOOGLE_CLIENT_ID` | For Google login | Browser Google OAuth client ID |
+
+Production value:
+
+```env
+VITE_API_URL=https://skillswap-1-x54c.onrender.com/api
+```
+
+Vite variables are compiled into the client bundle, so changing them requires a frontend rebuild.
 
 ## API reference
 
-All routes except registration/login are JWT-protected unless stated otherwise.
+All application routes except registration, login, and Google authentication require a Bearer JWT.
 
 ### Authentication
 
 | Method | Route | Purpose |
 |---|---|---|
-| `POST` | `/api/auth/register` | Register with email/password |
-| `POST` | `/api/auth/login` | Login and receive a JWT |
-| `POST` | `/api/auth/google` | Verify a Google ID token and login/register |
+| `POST` | `/api/auth/register` | Create an account and immediately return a JWT |
+| `POST` | `/api/auth/login` | Authenticate and return a JWT |
+| `POST` | `/api/auth/google` | Authenticate or register with a Google ID token |
+| `POST` | `/api/auth/logout` | Revoke the current token version |
 
 Authentication routes are limited to 20 requests per 15 minutes.
 
@@ -487,76 +413,71 @@ Authentication routes are limited to 20 requests per 15 minutes.
 |---|---|---|
 | `GET` | `/api/users` | Browse non-suspended users with aggregate ratings |
 | `GET` | `/api/users/me` | Load the authenticated profile |
-| `PUT` | `/api/users/me/skills` | Replace offered and wanted skills |
-| `PUT` | `/api/users/me/profile` | Update bio, timezone, location, and availability |
+| `PUT` | `/api/users/me` | Atomically replace profile details and skills |
+| `PUT` | `/api/users/me/skills` | Backward-compatible skills update |
+| `PUT` | `/api/users/me/profile` | Backward-compatible profile update |
 
 ### Bookings
 
 | Method | Route | Purpose |
 |---|---|---|
-| `POST` | `/api/bookings` | Create a pending booking |
-| `GET` | `/api/bookings` | List bookings involving the current user |
-| `PATCH` | `/api/bookings/:id/status` | Provider accepts or declines a pending booking |
-| `PATCH` | `/api/bookings/:id/complete` | Requester completes an accepted booking and transfers credit |
+| `POST` | `/api/bookings` | Create a booking; requires `Idempotency-Key` |
+| `GET` | `/api/bookings` | List the current user's bookings |
+| `PATCH` | `/api/bookings/:id/status` | Accept or decline a pending booking |
+| `PATCH` | `/api/bookings/:id/complete` | Complete a booking and transfer one credit |
 
 ### Reviews
 
 | Method | Route | Purpose |
 |---|---|---|
 | `POST` | `/api/reviews` | Review a completed booking |
-| `GET` | `/api/reviews/mine` | Return booking IDs already reviewed by the current user |
+| `GET` | `/api/reviews/mine` | Return booking IDs reviewed by the current user |
 | `GET` | `/api/reviews/:userId` | Return rating summary and populated reviews |
-| `GET` | `/api/reviews/user/:userId` | Backward-compatible alias |
+| `GET` | `/api/reviews/user/:userId` | Backward-compatible review alias |
 
 ### Messages
 
 | Method | Route | Purpose |
 |---|---|---|
-| `GET` | `/api/messages/unread` | Count unread message documents |
+| `GET` | `/api/messages/unread` | Count unread messages |
 | `GET` | `/api/messages/:userId` | Load a conversation and mark incoming messages read |
-| `POST` | `/api/messages/:userId` | Send a message to a connected user |
+| `POST` | `/api/messages/:userId` | Send a message to a booking connection |
 
-### In-app notifications
+### Notifications
 
 | Method | Route | Purpose |
 |---|---|---|
-| `GET` | `/api/notifications` | Return the latest 100 notifications |
+| `GET` | `/api/notifications` | Return paginated recent notifications |
 | `GET` | `/api/notifications/unread-count` | Return total and per-type unread counts |
-| `PATCH` | `/api/notifications/:id/read` | Mark one owned notification read |
-| `PATCH` | `/api/notifications/read` | Mark all notifications, or `body.type`, read |
+| `PATCH` | `/api/notifications/:id/read` | Mark one notification read |
+| `PATCH` | `/api/notifications/read` | Mark all or one notification type read |
 
-### Credits and matching
+Notification types are `booking`, `message`, `review`, and `credit`. Notification documents expire after 90 days.
 
-| Method | Route | Purpose |
-|---|---|---|
-| `GET` | `/api/credits/history` | Return the current user's populated credit ledger |
-| `GET` | `/api/matches` | Return remote or locally generated recommendations |
-
-### Admin
-
-These routes require `role: admin`.
+### Credits, matching, and administration
 
 | Method | Route | Purpose |
 |---|---|---|
-| `GET` | `/api/admin/stats` | Platform totals |
-| `GET` | `/api/admin/users` | List users without password hashes |
-| `PATCH` | `/api/admin/users/:id/status` | Suspend or restore an account |
-| `DELETE` | `/api/admin/reviews/:id` | Remove a review |
+| `GET` | `/api/credits/history` | Return the current user's credit ledger |
+| `GET` | `/api/matches` | Return remote or local recommendations |
+| `GET` | `/api/admin/stats` | Return platform totals; admin only |
+| `GET` | `/api/admin/users` | List users; admin only |
+| `PATCH` | `/api/admin/users/:id/status` | Suspend or restore a user; admin only |
+| `DELETE` | `/api/admin/reviews/:id` | Delete a review; admin only |
 
-### Service-only endpoints
+### Service endpoints
 
 | Service | Method | Route | Purpose |
 |---|---|---|---|
+| API | `GET` | `/health` | Database-aware readiness response |
 | Matching | `GET` | `/` | Health response |
 | Matching | `POST` | `/match` | Score supplied candidates |
 | Notification | `GET` | `/` | Health response |
-| Notification | `POST` | `/notify` | Render and send a supported booking email |
+| Notification | `POST` | `/notify` | Send a booking email; requires `X-Notification-Key` |
 
-Supported email event types are `BOOKING_CREATED`, `BOOKING_ACCEPTED`, `BOOKING_DECLINED`, and `BOOKING_COMPLETED`.
+Supported email events are `BOOKING_CREATED`, `BOOKING_ACCEPTED`, `BOOKING_DECLINED`, and `BOOKING_COMPLETED`.
 
-## Testing and CI
-
-Run the same core checks locally:
+## Testing
 
 ```bash
 cd server
@@ -566,67 +487,77 @@ cd ../client
 npm run lint
 npm run build
 
+cd ../matching-service
+python -m unittest -v
+
+cd ../notification-service
+python -m unittest -v
+
 cd ..
 docker compose config
 ```
 
-The GitHub Actions workflow currently:
-
-1. Installs backend dependencies and runs Jest.
-2. Installs frontend dependencies, runs ESLint, and builds the Vite bundle.
-3. Imports each Flask application after installing its dependencies.
-4. validates `docker compose config`.
+CI uses `npm ci`, runs backend tests, lints and builds the frontend, runs both Python test suites, and validates Docker Compose.
 
 ## Deployment
 
-### Vercel
+### Vercel frontend
 
 - Root directory: `client`
 - Build command: `npm run build`
 - Output directory: `dist`
-- Configure both `VITE_*` variables before building.
-- `client/vercel.json` rewrites SPA routes to `index.html`.
+- Configure `VITE_API_URL` and, if enabled, `VITE_GOOGLE_CLIENT_ID`
 
-### Render main API
+### Render API
 
 - Root directory: `server`
-- Runtime: Node or the included Dockerfile
-- Start command without Docker: `node server.js`
-- Configure MongoDB, JWT, Google, matching, and notification variables.
+- Start command: `node server.js`
+- Configure MongoDB, JWT, Google, matching, notification, CORS, and proxy variables
 
 ### Render matching service
 
 - Root directory: `matching-service`
-- Use the included Dockerfile, which runs Gunicorn on Render's `PORT`.
+- Deploy using the included Dockerfile and Gunicorn
 
 ### Render notification service
 
 - Root directory: `notification-service`
 - Public URL: `https://skillswap-2-vtzd.onrender.com/`
-- Use the included Gunicorn Dockerfile and configure every SMTP variable plus `NOTIFICATION_SERVICE_API_KEY` on this service.
-- Configure the main API's `NOTIFICATION_SERVICE_URL` to this public URL.
+- Deploy using the included Dockerfile and Gunicorn
+- Configure `RESEND_API_KEY`, `EMAIL_FROM`, and `NOTIFICATION_SERVICE_API_KEY`
+- Use the same `NOTIFICATION_SERVICE_API_KEY` on the Express API
+
+## One-time migration after removing email verification
+
+Email verification is no longer part of SkillSwap. For databases created by older versions, run once from the `server` directory:
+
+```bash
+npm run migrate:remove-email-verification
+```
+
+This removes obsolete verification fields from users and deletes pending verification email jobs. It does not remove users or booking-notification jobs.
 
 ## Security behavior
 
-- Passwords are hashed with bcrypt using 10 salt rounds.
-- Local registration creates an authenticated session immediately after the address and password pass validation.
-- JWTs expire after one hour by default and are revoked server-side when the user signs out.
-- Protected requests reload user status and role from MongoDB.
-- Suspended users are rejected by the authentication middleware.
-- Admin authorization is enforced server-side.
-- Google credentials are verified against `GOOGLE_CLIENT_ID`.
-- Review uniqueness and message/booking participant rules are enforced server-side.
-- Secrets belong in environment variables; only placeholder `.env.example` files are committed.
+- Passwords are hashed with bcrypt.
+- Local registration authenticates immediately after validation.
+- Temporary email domains are rejected, and registration checks for a deliverable mail domain.
+- JWTs expire after one hour by default.
+- Logout increments the user's token version and invalidates issued tokens.
+- Protected requests reload the user's current role and status.
+- Helmet security headers and an explicit CORS allowlist are enabled.
+- Authentication endpoints are rate-limited behind the configured trusted proxy.
+- The notification endpoint requires a timing-safe shared-secret comparison.
+- Booking, messaging, review, and administration permissions are enforced server-side.
+- Secrets belong in deployment environment variables and must never be committed.
 
 ## Current limitations
 
-- Notifications use 15-second visibility-aware polling rather than WebSockets or server-sent events.
-- Email delivery is synchronous with a bounded timeout and has no durable retry queue.
-- The matching service is intentionally simple and has an in-process fallback.
-- Browse, notifications, bookings, messages, and reviews do not yet have pagination.
-- CORS currently uses the package defaults rather than an explicit production allowlist.
-- Several controllers still rely on Mongoose validation instead of a uniform request-schema layer.
-- The local Docker MongoDB service is standalone; use Atlas or configure a replica set for booking-completion transactions.
+- Notification badges use polling rather than WebSockets or server-sent events.
+- The email queue runs inside the API process rather than a separate worker deployment.
+- Matching is intentionally lightweight and uses an in-process fallback.
+- Controller validation is not yet consolidated into a single schema-validation library.
+- Automated tests emphasize controllers and service boundaries; browser end-to-end coverage is not yet included.
 
 ## Author
 
