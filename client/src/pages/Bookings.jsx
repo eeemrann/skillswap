@@ -163,10 +163,14 @@ function Bookings() {
   {(isProvider || isRequester) &&
     (booking.status === 'accepted' || booking.status === 'completed') && (
       <Link
-        to={`/messages?with=${isProvider ? booking.requester._id : booking.provider._id}`}
-      >
-        Message
-      </Link>
+  to={`/messages?with=${
+    isProvider
+      ? booking.requester?._id
+      : booking.provider?._id
+  }`}
+>
+  Message
+</Link>
     )}
 
 </div>
