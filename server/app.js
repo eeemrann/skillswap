@@ -21,6 +21,12 @@ if (!process.env.CLERK_SECRET_KEY) {
   console.warn('[Clerk] CLERK_SECRET_KEY is not configured; Clerk token verification may fail.');
 }
 
+// TEMP AUTH DEBUG: remove after diagnosing intermittent 401 responses.
+console.warn('[Clerk Debug] Key prefixes', {
+  secretKey: process.env.CLERK_SECRET_KEY ? `${process.env.CLERK_SECRET_KEY.slice(0, 12)}...` : 'MISSING',
+  publishableKey: process.env.CLERK_PUBLISHABLE_KEY ? `${process.env.CLERK_PUBLISHABLE_KEY.slice(0, 12)}...` : 'MISSING'
+});
+
 app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS || 1));
 const normalizeOrigin = (value) => value.trim().replace(/\/+$/, '');
 const defaultOrigins = [

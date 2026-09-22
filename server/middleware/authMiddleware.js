@@ -5,14 +5,32 @@ module.exports = async function auth(req, res, next) {
   try {
     const authHeader = req.headers?.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.warn('[Auth Middleware] Missing or malformed Authorization header', { method: req.method, path: req.originalUrl });
+      // TEMP AUTH DEBUG: remove after diagnosing intermittent 401 responses.
+      console.warn('[Auth Middleware] Missing or malformed Authorization header', {
+        method: req.method,
+        path: req.originalUrl,
+        authorizationPresent: Boolean(authHeader),
+        authorizationPrefix: authHeader ? `${authHeader.slice(0, 20)}...` : null
+      });
     }
 
     const authData = getAuth(req);
     req.auth = authData;
     const userId = authData?.userId;
     if (!userId) {
+      // TEMP AUTH DEBUG: remove after diagnosing intermittent 401 responses.
       console.warn('[Auth Middleware] getAuth(req) did not find a valid userId. Check CLERK_SECRET_KEY and Clerk configuration.');
+      console.warn('[Auth Middleware] Auth diagnostic', JSON.stringify({
+        authorizationPresent: Boolean(authHeader),
+        authorizationPrefix: authHeader ? `${authHeader.slice(0, 20)}...` : null,
+        authData: authData ? {
+          userId: authData.userId || null,
+          sessionId: authData.sessionId || null,
+          isAuthenticated: authData.isAuthenticated,
+          reason: authData.reason,
+          error: typeof authData.error === 'string' ? authData.error : authData.error?.message || null
+        } : null
+      }));
       return res.status(401).json({ message: 'Authentication required' });
     }
 
