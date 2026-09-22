@@ -201,12 +201,18 @@ exports.updateCompleteProfile = async (req, res) => {
     const { bio, timezone, location, availability } = req.body;
     const cleanAvailability = Array.isArray(availability) ? availability.filter((slot) => slot?.day && slot?.start && slot?.end).slice(0, 30) : [];
     if (cleanAvailability.some((slot) => slot.start >= slot.end)) return res.status(400).json({ message: 'Availability end time must be after start time' });
-    const user = await User.findByIdAndUpdate(req.userId, {
-      skillsOffered: cleanSkills(req.body.skillsOffered), skillsWanted: cleanSkills(req.body.skillsWanted),
-      bio: typeof bio === 'string' ? bio.trim() : '',
-      timezone: typeof timezone === 'string' && timezone.length <= 100 ? timezone.trim() : 'UTC',
-      availability: cleanAvailability
-    }, { new: true, runValidators: true }).select('-password');
+    const user = req.user || await findUserByAnyId(req.userId || req.clerkUserId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    user.skillsOffered = cleanSkills(req.body.skillsOffered);
+    user.skillsWanted = cleanSkills(req.body.skillsWanted);
+    user.bio = typeof bio === 'string' ? bio.trim() : '';
+    user.timezone = typeof timezone === 'string' && timezone.length <= 100 ? timezone.trim() : 'UTC';
+    user.availability = cleanAvailability;
+    /*
+     * Location is intentionally patched on the loaded document. This keeps
+     * existing coordinates intact when the profile form only sends city and
+     * country, and never creates a Point without coordinates.
+     */
     if (location && typeof location === 'object') {
       user.location = user.location || {};
       if (location.city !== undefined) user.location.city = String(location.city).trim().slice(0, 100);
@@ -216,10 +222,17 @@ exports.updateCompleteProfile = async (req, res) => {
         user.location.type = 'Point';
         user.location.coordinates = [...location.coordinates];
       }
-      await user.save();
+      if (!validCoordinates(user.location.coordinates)) {
+        user.location.type = undefined;
+        user.location.coordinates = undefined;
+      }
     }
-    return res.json(user);
+    const updatedUser = await user.save();
+    const profile = updatedUser.toObject();
+    delete profile.password;
+    return res.json(profile);
   } catch (error) {
-    return res.status(400).json({ message: 'Profile update failed' });
+    console.error('[updateProfile Error]:', error.message, error.errors);
+    return res.status(400).json({ message: error.message || 'Profile update failed' });
   }
 };
