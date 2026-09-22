@@ -37,9 +37,23 @@ api.interceptors.request.use(async (config) => {
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     const message = error.response?.data?.message || error.message;
     console.warn(`[API ${error.config?.method?.toUpperCase()} ${error.config?.url}]`, message);
+    const config = error.config;
+    if (error.response?.status === 401 && config && !config._retried && clerkTokenGetter) {
+      config._retried = true;
+      try {
+        const token = await clerkTokenGetter();
+        if (token) {
+          config.headers = config.headers || {};
+          config.headers.Authorization = `Bearer ${token}`;
+          return api(config);
+        }
+      } catch (tokenError) {
+        console.warn('[Axios] Failed to refresh session token:', tokenError.message);
+      }
+    }
     return Promise.reject(error);
   }
 );
