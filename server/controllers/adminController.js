@@ -20,6 +20,9 @@ exports.getUsers = async (req, res) => {
 
 exports.updateUserStatus = async (req, res) => {
   if (!['active', 'suspended'].includes(req.body.status)) return res.status(400).json({ message: 'Invalid status' });
+  if (req.body.status === 'suspended' && String(req.userId) === String(req.params.id)) {
+    return res.status(400).json({ message: 'Admins cannot suspend their own account.' });
+  }
   const user = await User.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true, runValidators: true }).select('-password');
   if (!user) return res.status(404).json({ message: 'User not found' });
   res.json(user);

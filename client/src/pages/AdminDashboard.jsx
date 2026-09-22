@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
 import AppShell from '../components/AppShell';
 import api from '../api/axios';
 
@@ -6,6 +7,8 @@ function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [message, setMessage] = useState('');
+  const currentUser = useSelector((state) => state.auth.user);
+  const currentUserId = currentUser?.id || currentUser?._id;
 
   const load = async () => {
     try {
@@ -73,9 +76,13 @@ function AdminDashboard() {
                 </div>
               </div>
               <div className="booking-actions">
-                <button type="button" onClick={() => updateStatus(user._id, user.status === 'active' ? 'suspended' : 'active')}>
-                  {user.status === 'active' ? 'Suspend' : 'Restore'}
-                </button>
+                {String(user._id) === String(currentUserId) ? (
+                  <span className="form-hint" title="You cannot modify your own account status">Current Admin (You)</span>
+                ) : (
+                  <button type="button" onClick={() => updateStatus(user._id, user.status === 'active' ? 'suspended' : 'active')}>
+                    {user.status === 'active' ? 'Suspend' : 'Restore'}
+                  </button>
+                )}
               </div>
             </div>
           ))}
