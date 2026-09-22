@@ -32,6 +32,7 @@ MongoDB must run as a replica set because completing a booking uses a multi-docu
 - Admin analytics, review moderation, and user suspension controls.
 - Backend protection against administrators suspending themselves.
 - Durable booking email jobs with retries and expiry.
+- Location-aware discovery: Browse requests the browser location and searches within 25 km.
 
 Clerk owns email verification. SkillSwap does not send verification OTPs; its notification service sends only booking-related messages.
 
@@ -228,17 +229,25 @@ Never commit `.env`, `.env.local`, Clerk secret keys, database credentials, or R
 6. Saving calls `PUT /api/users/me/skills`, updates Redux, and navigates to `/dashboard`.
 7. Clerk, not the API or notification service, sends verification codes.
 
+## Location-aware discovery
+
+The Browse page requests browser geolocation when available, saves it through `PATCH /api/users/me/location`, and then requests `GET /api/users?lng=<longitude>&lat=<latitude>`. Coordinates are always stored in GeoJSON order: `[longitude, latitude]`.
+
+The `User.location` field uses a sparse MongoDB `2dsphere` index. With valid coordinates, the API uses `$geoNear` with a 25,000-meter maximum distance and returns `distanceKm` for each nearby member. Suspended users and the requester are excluded. Members without valid location data are excluded from the geospatial result.
+
+If location permission is unavailable, query coordinates are invalid, the geospatial index is unavailable, or no nearby users are found, the API returns a safe `200` response containing non-suspended users as a compatibility fallback. The Browse page keeps cards visible even when a member has no listed skills.
+
 ## API overview
 
 Protected routes require a Clerk session token. The API is mounted under `/api`.
 
 | Area | Routes |
 |---|---|
-| Users | `GET /users`, `GET /users/me`, `PUT /users/me`, `PUT /users/me/skills`, `PUT /users/me/profile` |
+| Users | `GET /users?lng=<longitude>&lat=<latitude>`, `GET /users/me`, `PATCH /users/me/location`, `PUT /users/me`, `PUT /users/me/skills`, `PUT /users/me/profile` |
 | Bookings | `GET /bookings`, `POST /bookings`, `PATCH /bookings/:id/status`, `PATCH /bookings/:id/complete` |
 | Credits | `GET /credits/history` |
 | Matching | `GET /matches` |
-| Reviews | `POST /reviews`, `GET /reviews/mine`, `GET /reviews/:userId` |
+| Reviews | `POST /reviews`, `GET /reviews/mine`, `GET /reviews/:userId`, `GET /reviews/user/:userId` |
 | Messages | `GET /messages/unread`, `GET /messages/:userId`, `POST /messages/:userId` |
 | Notifications | `GET /notifications`, `GET /notifications/unread-count`, `PATCH /notifications/:id/read`, `PATCH /notifications/read` |
 | Admin | `GET /admin/stats`, `GET /admin/users`, `PATCH /admin/users/:id/status`, `DELETE /admin/reviews/:id` |
