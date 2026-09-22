@@ -17,13 +17,19 @@ function Messages() {
   const [body, setBody] = useState('');
   const [message, setMessage] = useState('');
 
-  const loadMessages = useCallback(async (targetUserId) => {
+  const loadMessages = useCallback(async (targetUserId, isActive = () => true) => {
     const id = targetUserId || userId;
     if (!id) return;
-    try { setLoadingMessages(true); const res = await api.get(`/messages/${id}`); setMessages(res.data); setMessage(''); }
-    catch (err) { setMessage(err.response?.data?.message || 'Could not load messages.'); }
-    finally { setLoadingMessages(false); }
-  }, [userId]);
+    try {
+      setLoadingMessages(true);
+      const res = await api.get(`/messages/${id}`);
+      if (isActive()) { setMessages(res.data); setMessage(''); dispatch(fetchUnreadCounts()); }
+    } catch (err) {
+      if (isActive()) setMessage(err.response?.data?.message || 'Could not load messages.');
+    } finally {
+      if (isActive()) setLoadingMessages(false);
+    }
+  }, [dispatch, userId]);
 
   useEffect(() => {
     let active = true;
@@ -45,12 +51,19 @@ function Messages() {
   useEffect(() => {
     if (!userId) return undefined;
     let active = true;
-    queueMicrotask(() => { if (active) setLoadingMessages(true); });
-    api.get(`/messages/${userId}`).then((res) => { if (active) { setMessages(res.data); setMessage(''); dispatch(fetchUnreadCounts()); } })
-      .catch((err) => { if (active) setMessage(err.response?.data?.message || 'Could not load messages.'); })
-      .finally(() => { if (active) setLoadingMessages(false); });
-    return () => { active = false; };
-  }, [userId, dispatch]);
+    const refresh = () => {
+      if (!document.hidden && active) loadMessages(userId, () => active);
+    };
+
+    queueMicrotask(() => { if (active) loadMessages(userId, () => active); });
+    const intervalId = window.setInterval(refresh, 3000);
+    window.addEventListener('focus', refresh);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [userId, loadMessages]);
 
   const sendMessage = async (event) => {
     event.preventDefault(); const cleanBody = body.trim(); if (!cleanBody) return;

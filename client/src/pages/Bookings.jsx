@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import api from '../api/axios';
@@ -16,33 +16,36 @@ function Bookings() {
   const currentUser = useSelector((state) => state.auth.user);
   const dispatch = useDispatch();
 
-  const fetchAll = async () => {
+  const mountedRef = useRef(true);
+  const fetchAll = useCallback(async () => {
     try {
       const [bookingsRes, reviewedRes] = await Promise.all([
         api.get('/bookings'),
         api.get('/reviews/mine')
       ]);
+      if (!mountedRef.current) return;
       setBookings(bookingsRes.data);
       setReviewedIds(reviewedRes.data);
     } catch {
-      setMessage('Failed to load bookings');
+      if (mountedRef.current) setMessage('Failed to load bookings');
     }
-  };
+  }, []);
 
   useEffect(() => {
+    mountedRef.current = true;
     dispatch(markNotificationTypeRead('booking'));
-    let active = true;
-    Promise.all([api.get('/bookings'), api.get('/reviews/mine')])
-      .then(([bookingsRes, reviewedRes]) => {
-        if (!active) return;
-        setBookings(bookingsRes.data);
-        setReviewedIds(reviewedRes.data);
-      })
-      .catch(() => {
-        if (active) setMessage('Failed to load bookings');
-      });
-    return () => { active = false; };
-  }, [dispatch]);
+    queueMicrotask(fetchAll);
+    const refresh = () => {
+      if (!document.hidden) fetchAll();
+    };
+    const intervalId = window.setInterval(refresh, 10000);
+    window.addEventListener('focus', refresh);
+    return () => {
+      mountedRef.current = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [dispatch, fetchAll]);
 
   const respondToBooking = async (id, status) => {
     try {

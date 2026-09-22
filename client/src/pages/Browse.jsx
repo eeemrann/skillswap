@@ -9,7 +9,22 @@ function Browse() {
   const [users, setUsers] = useState([]); const [query, setQuery] = useState(''); const [error, setError] = useState(''); const [loading, setLoading] = useState(true);
   const [bookingForm, setBookingForm] = useState(null); const [proposedTime, setProposedTime] = useState(''); const [message, setMessage] = useState(''); const [sending, setSending] = useState(false);
   const [reviewProfile, setReviewProfile] = useState(null); const [reviewsLoading, setReviewsLoading] = useState(false);
-  useEffect(() => { let active = true; api.get('/users').then((res) => { if (active) setUsers(res.data); }).catch(() => { if (active) setError('We could not load the community right now.'); }).finally(() => { if (active) setLoading(false); }); return () => { active = false; }; }, []);
+  useEffect(() => {
+    let active = true;
+    const loadUsers = (initial = false) => {
+      api.get('/users')
+        .then((res) => { if (active) setUsers(res.data); })
+        .catch(() => { if (active) setError('We could not load the community right now.'); })
+        .finally(() => { if (active && initial) setLoading(false); });
+    };
+    loadUsers(true);
+    const refreshOnFocus = () => loadUsers(false);
+    window.addEventListener('focus', refreshOnFocus);
+    return () => {
+      active = false;
+      window.removeEventListener('focus', refreshOnFocus);
+    };
+  }, []);
   const visibleUsers = useMemo(() => users.filter((user) => `${user.name} ${(user.skillsOffered || []).join(' ')} ${(user.skillsWanted || []).join(' ')}`.toLowerCase().includes(query.trim().toLowerCase())), [users, query]);
   const openBookingForm = (providerId, providerName, skill) => { setBookingForm({ providerId, providerName, skill }); setMessage(''); };
   const submitBooking = async (event) => { event.preventDefault(); setSending(true); setError(''); try { const key = crypto.randomUUID(); await api.post('/bookings', { providerId: bookingForm.providerId, skill: bookingForm.skill, proposedTime: new Date(proposedTime).toISOString(), durationMinutes: 60 }, { headers: { 'Idempotency-Key': key } }); setMessage(`Request sent to ${bookingForm.providerName}.`); setBookingForm(null); setProposedTime(''); } catch (err) { setError(err.response?.data?.message || 'Failed to send request.'); } finally { setSending(false); } };
