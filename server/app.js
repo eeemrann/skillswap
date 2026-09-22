@@ -17,6 +17,10 @@ const notificationRoutes = require('./routes/notificationRoutes');
 
 const app = express();
 
+if (!process.env.CLERK_SECRET_KEY) {
+  console.warn('[Clerk] CLERK_SECRET_KEY is not configured; Clerk token verification may fail.');
+}
+
 app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS || 1));
 const normalizeOrigin = (value) => value.trim().replace(/\/+$/, '');
 const defaultOrigins = [
@@ -43,7 +47,9 @@ app.use(cors(corsOptions));
 // Express 5 requires a named wildcard parameter for a catch-all route.
 app.options('/{*splat}', cors(corsOptions));
 app.use(express.json({ limit: '100kb' }));
-app.use(clerkMiddleware());
+app.use(clerkMiddleware(process.env.CLERK_SECRET_KEY
+  ? { secretKey: process.env.CLERK_SECRET_KEY }
+  : {}));
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
