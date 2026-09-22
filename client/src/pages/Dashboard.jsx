@@ -1,45 +1,71 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useAuth } from '@clerk/clerk-react';
 import { Link } from 'react-router-dom';
 import api from '../api/axios';
 import AppShell from '../components/AppShell';
 import Icon from '../components/Icon';
+import { updateUser } from '../redux/authSlice';
 import { fetchNotifications, fetchUnreadCounts, markNotificationRead } from '../redux/notificationSlice';
 
 const initials = (name = '') => name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase();
 
 function Dashboard() {
   const user = useSelector((state) => state.auth.user);
+  const authToken = useSelector((state) => state.auth.token);
   const { isLoaded, isSignedIn } = useAuth();
   const { items: notifications, loading: notificationsLoading } = useSelector((state) => state.notifications);
   const dispatch = useDispatch();
   const [matches, setMatches] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState('');
+  const mountedRef = useRef(true);
+
+  // Clerk supplies the actual request token through the Axios interceptor;
+  // the fallback keeps this refresh active for Clerk sessions before Redux
+  // has a legacy token value.
+  const token = authToken || (isSignedIn ? 'clerk-session' : null);
+
+  const refreshDashboard = useCallback(async (isInitial = false) => {
+    if (!token) return;
+    if (isInitial) setLoading(true);
+
+    const [userResult, matchResult, bookingResult] = await Promise.allSettled([
+      api.get('/users/me'),
+      api.get('/matches'),
+      api.get('/bookings')
+    ]);
+
+    if (!mountedRef.current) return;
+    if (userResult.status === 'fulfilled') dispatch(updateUser(userResult.value.data));
+    if (matchResult.status === 'fulfilled') setMatches(matchResult.value.data);
+    if (bookingResult.status === 'fulfilled') setBookings(bookingResult.value.data);
+    if (isInitial) setLoading(false);
+  }, [dispatch, token]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return undefined;
-    let active = true;
-    Promise.allSettled([api.get('/matches'), api.get('/bookings')]).then(([matchResult, bookingResult]) => {
-      if (!active) return;
-      setMatches(matchResult.status === 'fulfilled' ? matchResult.value.data : []);
-      if (bookingResult.status === 'fulfilled') setBookings(bookingResult.value.data);
-      if (matchResult.status === 'rejected' || bookingResult.status === 'rejected') setLoadError('Some dashboard information could not be loaded. Please refresh to try again.');
-      setLoading(false);
-    });
+    mountedRef.current = true;
+    queueMicrotask(() => refreshDashboard(true));
+    const refreshWhenVisible = () => {
+      if (!document.hidden) refreshDashboard(false);
+    };
+    const intervalId = window.setInterval(refreshWhenVisible, 10000);
+    window.addEventListener('focus', refreshWhenVisible);
     dispatch(fetchNotifications());
     dispatch(fetchUnreadCounts());
-    return () => { active = false; };
-  }, [dispatch, isLoaded, isSignedIn]);
+    return () => {
+      mountedRef.current = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refreshWhenVisible);
+    };
+  }, [dispatch, isLoaded, isSignedIn, refreshDashboard]);
 
   const upcoming = bookings.filter((item) => ['pending', 'accepted'].includes(item.status)).slice(0, 3);
   const completed = bookings.filter((item) => item.status === 'completed').length;
 
   return (
     <AppShell eyebrow="Workspace overview" title={`Welcome back, ${user?.name?.split(' ')[0] || 'there'}.`} description="Everything you need to keep learning, teaching, and building momentum." action={<Link className="primary-button" to="/browse">Explore skills <Icon name="arrow" size={16}/></Link>}>
-      {loadError && <p className="status-message error" role="alert">{loadError}</p>}
       <div className="content-grid dashboard-grid">
         <div className="stat-row">
           <div className="stat-card"><small>Available credits</small><strong>{user?.creditBalance ?? 0} <em>hours</em></strong></div>

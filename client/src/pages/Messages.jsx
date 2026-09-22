@@ -17,17 +17,17 @@ function Messages() {
   const [body, setBody] = useState('');
   const [message, setMessage] = useState('');
 
-  const loadMessages = useCallback(async (targetUserId, isActive = () => true) => {
+  const loadMessages = useCallback(async (targetUserId, isSilent = false, isActive = () => true) => {
     const id = targetUserId || userId;
     if (!id) return;
     try {
-      setLoadingMessages(true);
+      if (!isSilent) setLoadingMessages(true);
       const res = await api.get(`/messages/${id}`);
       if (isActive()) { setMessages(res.data); setMessage(''); dispatch(fetchUnreadCounts()); }
     } catch (err) {
       if (isActive()) setMessage(err.response?.data?.message || 'Could not load messages.');
     } finally {
-      if (isActive()) setLoadingMessages(false);
+      if (!isSilent && isActive()) setLoadingMessages(false);
     }
   }, [dispatch, userId]);
 
@@ -52,10 +52,14 @@ function Messages() {
     if (!userId) return undefined;
     let active = true;
     const refresh = () => {
-      if (!document.hidden && active) loadMessages(userId, () => active);
+      if (!document.hidden && active) loadMessages(userId, true, () => active);
     };
 
-    queueMicrotask(() => { if (active) loadMessages(userId, () => active); });
+    queueMicrotask(() => {
+      if (!active) return;
+      setMessages([]);
+      loadMessages(userId, false, () => active);
+    });
     const intervalId = window.setInterval(refresh, 3000);
     window.addEventListener('focus', refresh);
     return () => {
@@ -83,7 +87,7 @@ function Messages() {
           {message && <p className={`status-message ${message === 'Message sent.' ? '' : 'error'}`} role="status">{message}</p>}
           {!userId ? <div className="empty-state"><strong>Select a conversation</strong>Choose a member to start chatting.</div> : <>
             <div className="message-stream" aria-live="polite">
-              {loadingMessages && <p className="form-hint">Loading conversation...</p>}
+              {loadingMessages && messages.length === 0 && <p className="form-hint">Loading conversation...</p>}
               {!loadingMessages && messages.length === 0 && <div className="empty-state"><strong>No messages yet</strong>Say hello to start the conversation.</div>}
               {messages.map((item) => { const ownId = currentUser?._id || currentUser?.id; return <div className={`message-bubble ${item.sender === ownId || item.sender?._id === ownId ? 'mine' : ''}`} key={item._id}><p>{item.body}</p><small>{new Date(item.createdAt).toLocaleString()}</small></div>; })}
             </div>
