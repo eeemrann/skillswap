@@ -4,7 +4,9 @@ const User = require('../models/User');
 // Verifies Clerk's JWT, then maps the Clerk identity to the existing Mongo user.
 module.exports = async function auth(req, res, next) {
   try {
-    const { userId } = getAuth(req);
+    const auth = getAuth(req);
+    req.auth = auth;
+    const { userId } = auth;
     if (!userId) return res.status(401).json({ message: 'Authentication required' });
 
     const clerkUser = await clerkClient.users.getUser(userId);

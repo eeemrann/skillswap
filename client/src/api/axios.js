@@ -14,13 +14,18 @@ const api = axios.create({
 });
 
 let clerkTokenGetter = null;
-export const bindClerkTokenGetter = (getterFn) => { clerkTokenGetter = getterFn || null; };
+export const setClerkTokenGetter = (getter) => { clerkTokenGetter = getter || null; };
+// Backward-compatible alias for existing imports.
+export const bindClerkTokenGetter = setClerkTokenGetter;
 
 api.interceptors.request.use(async (config) => {
   if (clerkTokenGetter) {
     try {
       const token = await clerkTokenGetter();
-      if (token) config.headers.Authorization = `Bearer ${token}`;
+      if (token) {
+        config.headers = config.headers || {};
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     } catch {
       // Proceed without a header if Clerk cannot provide a session token.
     }

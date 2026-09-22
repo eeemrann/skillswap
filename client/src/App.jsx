@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { ClerkProvider, useAuth } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
-import { bindClerkTokenGetter } from './api/axios';
+import { setClerkTokenGetter } from './api/axios';
 import api from './api/axios';
 import { updateUser, logout } from './redux/authSlice';
 import { fetchUnreadCounts } from './redux/notificationSlice';
@@ -52,7 +52,14 @@ function AppRoutes() {
   const { getToken, isSignedIn, isLoaded } = useAuth();
   const dispatch = useDispatch();
   const user = useSelector((state) => state.auth.user);
-  useEffect(() => { bindClerkTokenGetter(getToken); return () => bindClerkTokenGetter(null); }, [getToken]);
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) {
+      setClerkTokenGetter(null);
+      return undefined;
+    }
+    setClerkTokenGetter(() => getToken());
+    return () => setClerkTokenGetter(null);
+  }, [getToken, isLoaded, isSignedIn]);
   useEffect(() => {
     if (!isLoaded) return undefined;
     if (!isSignedIn) {
