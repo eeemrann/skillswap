@@ -32,7 +32,11 @@ const configuredOrigins = (process.env.CLIENT_ORIGINS || process.env.CLIENT_ORIG
   .split(',')
   .map(normalizeOrigin)
   .filter(Boolean);
-const allowedOrigins = [...new Set([...defaultOrigins, ...configuredOrigins])];
+const allowedOrigins = [...new Set([...defaultOrigins, ...configuredOrigins].flatMap((origin) => {
+  if (origin.startsWith('https://')) return [origin, origin.replace(/^https:\/\//, 'http://')];
+  if (origin.startsWith('http://')) return [origin, origin.replace(/^http:\/\//, 'https://')];
+  return [origin];
+}))];
 const corsOptions = {
   origin(origin, callback) {
     if (!origin) return callback(null, true);

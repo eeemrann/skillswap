@@ -1,5 +1,13 @@
 const mongoose = require('mongoose');
 
+const locationSchema = new mongoose.Schema({
+  type: { type: String, enum: ['Point'], default: 'Point' },
+  coordinates: { type: [Number], default: undefined },
+  city: { type: String, default: '' },
+  country: { type: String, default: '' },
+  lastUpdated: { type: Date, default: Date.now }
+}, { _id: false });
+
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true, maxlength: 80 },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true, maxlength: 254 },
@@ -14,13 +22,7 @@ const userSchema = new mongoose.Schema({
   bio: { type: String, maxlength: 500, default: '' },
   skillsOffered: [{ type: String, trim: true, maxlength: 80 }],
   skillsWanted: [{ type: String, trim: true, maxlength: 80 }],
-  location: {
-    type: { type: String, enum: ['Point'], default: 'Point' },
-    coordinates: { type: [Number], default: undefined },
-    city: { type: String, default: '' },
-    country: { type: String, default: '' },
-    lastUpdated: { type: Date, default: Date.now }
-  },
+  location: { type: locationSchema, default: undefined },
   timezone: { type: String, default: 'UTC' },
   availability: [{
     day: { type: String, enum: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] },
