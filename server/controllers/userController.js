@@ -21,11 +21,21 @@ const validCoordinates = (coordinates) => Array.isArray(coordinates)
 // GET the logged-in user's own profile
 exports.getProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.userId).select('-password'); // never send password back
+    if (req.user) {
+      const user = req.user.toObject ? req.user.toObject() : { ...req.user };
+      delete user.password;
+      return res.json(user);
+    }
+
+    const query = mongoose.Types.ObjectId.isValid(req.userId)
+      ? { _id: req.userId }
+      : { clerkId: req.userId };
+    const user = await User.findOne(query).select('-password');
     if (!user) return res.status(404).json({ message: 'User not found' });
-    res.json(user);
+    return res.json(user);
   } catch (err) {
-    res.status(500).json({ message: 'Profile could not be loaded' });
+    console.error('[getMe] Error fetching user profile:', err);
+    return res.status(500).json({ message: 'Server error retrieving profile' });
   }
 };
 
