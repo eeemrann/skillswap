@@ -56,7 +56,7 @@ function AppRoutes() {
 
   useEffect(() => {
     if (!isLoaded) return undefined;
-    setClerkTokenGetter(() => getToken);
+    setClerkTokenGetter(getToken);
     if (!isSignedIn) {
       dispatch(logout());
       queueMicrotask(() => setIsSynced(true));
