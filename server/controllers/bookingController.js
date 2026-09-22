@@ -18,6 +18,7 @@ exports.createBooking = async (req, res) => {
     if (previous) return res.json(previous);
     const provider = await User.findById(providerId);
     if (!provider) return res.status(404).json({ message: 'Provider not found' });
+    if (provider.status === 'suspended') return res.status(403).json({ message: 'This provider is unavailable' });
     if (!provider.skillsOffered.some((item) => item.toLowerCase() === skill.toLowerCase())) return res.status(400).json({ message: 'This provider does not offer that skill' });
     const time = new Date(req.body.proposedTime);
     if (Number.isNaN(time.getTime()) || time <= new Date()) return res.status(400).json({ message: 'Proposed time must be a valid future date' });
@@ -72,6 +73,22 @@ exports.updateBookingStatus = async (req, res) => {
     const existing = await Booking.findById(req.params.id);
     if (!existing) return res.status(404).json({ message: 'Booking not found' });
     if (existing.provider.toString() !== req.userId) return res.status(403).json({ message: 'Not authorized to update this booking' });
+    if (status === 'accepted') {
+      const end = new Date(existing.proposedTime.getTime() + existing.durationMinutes * 60000);
+      const conflict = await Booking.findOne({
+        _id: { $ne: existing._id },
+        status: { $in: ['pending', 'accepted'] },
+        $or: [
+          { requester: existing.requester }, { provider: existing.requester },
+          { requester: existing.provider }, { provider: existing.provider }
+        ],
+        $expr: { $and: [
+          { $lt: ['$proposedTime', end] },
+          { $gt: [{ $add: ['$proposedTime', { $multiply: [{ $ifNull: ['$durationMinutes', 60] }, 60000] }] }, existing.proposedTime] }
+        ] }
+      });
+      if (conflict) return res.status(409).json({ message: 'This time overlaps an existing booking' });
+    }
     const booking = await Booking.findOneAndUpdate({ _id: req.params.id, status: 'pending' }, { status }, { new: true, runValidators: true });
     if (!booking) return res.status(409).json({ message: 'Only pending bookings can be accepted or declined' });
     const [requester, provider] = await Promise.all([User.findById(booking.requester).select('email'), User.findById(booking.provider).select('name')]);

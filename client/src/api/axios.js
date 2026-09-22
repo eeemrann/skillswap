@@ -29,7 +29,7 @@ api.interceptors.request.use(async (config) => {
         config.headers.Authorization = `Bearer ${token}`;
       }
     } catch (error) {
-      console.warn('[Axios] Failed to acquire Clerk session token:', error);
+        console.warn('[Axios] Failed to get session token:', error.message);
     }
   }
   return config;
@@ -37,7 +37,11 @@ api.interceptors.request.use(async (config) => {
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => Promise.reject(error)
+  (error) => {
+    const message = error.response?.data?.message || error.message;
+    console.warn(`[API ${error.config?.method?.toUpperCase()} ${error.config?.url}]`, message);
+    return Promise.reject(error);
+  }
 );
 
 export default api;

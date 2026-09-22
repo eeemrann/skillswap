@@ -17,6 +17,10 @@ class MatchingServiceTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()[0]['id'], '1')
 
+    def test_match_rejects_invalid_json_shape(self):
+        response = app.test_client().post('/match', json={'candidates': ['not-an-object']})
+        self.assertEqual(response.status_code, 400)
+
 
 if __name__ == '__main__':
     unittest.main()

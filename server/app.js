@@ -44,7 +44,8 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'X-Requested-With', 'Accept']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'X-Requested-With', 'Accept'],
+  exposedHeaders: ['X-Total-Count', 'X-Location-Fallback']
 };
 app.use(helmet());
 app.use(cors(corsOptions));

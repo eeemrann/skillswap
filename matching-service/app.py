@@ -11,12 +11,16 @@ def health_check():
 
 @app.route('/match', methods=['POST'])
 def match():
-    data = request.get_json()
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"message": "A JSON object is required"}), 400
 
     my_skills_wanted = data.get('mySkillsWanted', [])
     my_location = data.get('myLocation', {}) or {}
     my_availability = data.get('myAvailability', []) or []
     candidates = data.get('candidates', [])  # list of { id, name, skillsOffered }
+    if not isinstance(candidates, list) or not all(isinstance(candidate, dict) for candidate in candidates):
+        return jsonify({"message": "candidates must be a list of objects"}), 400
 
     # Normalize to lowercase so "guitar" matches "Guitar"
     wanted_set = set(str(s).lower().strip() for s in my_skills_wanted if s)

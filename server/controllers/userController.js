@@ -118,7 +118,7 @@ exports.getAllUsers = async (req, res) => {
     const hasValidQueryCoordinates = req.query.lng !== undefined && req.query.lat !== undefined
       && Number.isFinite(lng) && Number.isFinite(lat)
       && lng >= -180 && lng <= 180 && lat >= -90 && lat <= 90;
-    if (!hasValidQueryCoordinates) return res.status(200).json(await fallback());
+    if (!hasValidQueryCoordinates) return res.set('X-Location-Fallback', 'true').status(200).json(await fallback());
     console.log('Querying near:', [lng, lat], 'Requester ID:', req.userId);
     const maxDistanceMeters = 25000;
     const users = await User.aggregate([
@@ -159,13 +159,13 @@ exports.getAllUsers = async (req, res) => {
     console.log('Found nearby users count:', users.length);
     if (users.length === 0) {
       console.log('GeoNear returned 0. Falling back to all active users.');
-      return res.status(200).json(await fallback());
+      return res.set('X-Location-Fallback', 'true').status(200).json(await fallback());
     }
     return res.status(200).json(users);
   } catch (err) {
     console.warn('Nearby user lookup unavailable; falling back to all active users:', err.message);
     try {
-      return res.status(200).json(await fallback());
+      return res.set('X-Location-Fallback', 'true').status(200).json(await fallback());
     } catch (fallbackError) {
       console.error('User fallback lookup failed:', fallbackError.message);
       return res.status(200).json([]);

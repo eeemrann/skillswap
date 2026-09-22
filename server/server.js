@@ -7,8 +7,9 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => {
     console.log('Connected to MongoDB');
     const stopEmailWorker = startEmailWorker();
-    const server = app.listen(process.env.PORT || 5000, () => {
-      console.log(`Server running on port ${process.env.PORT}`);
+    const port = Number(process.env.PORT || 5000);
+    const server = app.listen(port, () => {
+      console.log(`Server running on port ${port}`);
     });
     const shutdown = (signal) => {
       console.log(`${signal} received; shutting down`);

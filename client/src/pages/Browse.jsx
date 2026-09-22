@@ -14,21 +14,24 @@ function Browse() {
     const loadUsers = async (initial = false) => {
       try {
         let locationQuery = '';
+        let usedLocation = false;
         if (!document.hidden && navigator.geolocation) {
-          const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { maximumAge: 600000, timeout: 10000 }));
-          const { longitude, latitude } = position.coords;
-          await api.patch('/users/me/location', {
-            longitude,
-            latitude
-          });
-          locationQuery = `?lng=${encodeURIComponent(longitude)}&lat=${encodeURIComponent(latitude)}`;
+          try {
+            const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { maximumAge: 600000, timeout: 10000 }));
+            const { longitude, latitude } = position.coords;
+            await api.patch('/users/me/location', { longitude, latitude });
+            locationQuery = `?lng=${encodeURIComponent(longitude)}&lat=${encodeURIComponent(latitude)}`;
+            usedLocation = true;
+          } catch {
+            setLocationActive(false);
+          }
         }
         const res = await api.get(`/users${locationQuery}`);
-        console.log('Browse loaded users:', res.data);
         if (!active) return;
         const payload = Array.isArray(res.data) ? { users: res.data, locationRequired: false } : res.data;
         setUsers(payload.users || []);
-        setLocationActive(!payload.locationRequired);
+        const locationFallback = res.headers?.['x-location-fallback'] === 'true';
+        setLocationActive(usedLocation && !payload.locationRequired && !locationFallback);
       } catch (requestError) {
         if (active) setError(requestError.response?.data?.message || 'We could not load the community right now.');
       } finally {

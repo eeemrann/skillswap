@@ -56,9 +56,9 @@ function AppRoutes() {
 
   useEffect(() => {
     if (!isLoaded) return undefined;
+    setClerkTokenGetter(() => getToken);
     if (!isSignedIn) {
       dispatch(logout());
-      setClerkTokenGetter(null);
       queueMicrotask(() => setIsSynced(true));
       return undefined;
     }
@@ -66,7 +66,6 @@ function AppRoutes() {
     queueMicrotask(() => setIsSynced(false));
     const initializeSession = async () => {
       try {
-        setClerkTokenGetter(() => getToken());
         const token = await getToken();
         if (!token) throw new Error('Clerk session token was unavailable');
         const res = await api.get('/users/me');

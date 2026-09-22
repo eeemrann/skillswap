@@ -178,9 +178,11 @@ LOCAL_NOTIFICATION_SERVICE_API_KEY=local-shared-secret
 LOCAL_JWT_SECRET=legacy-local-secret
 GOOGLE_CLIENT_ID=
 VITE_API_URL=http://localhost:5000/api
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_replace_me
+CLERK_SECRET_KEY=sk_test_replace_me
 ```
 
-The current client Docker build forwards `VITE_API_URL` and the legacy Google argument, but not the Clerk publishable key. For Docker-based Clerk authentication, extend the client build arguments with `VITE_CLERK_PUBLISHABLE_KEY`; otherwise use the local Vite workflow above.
+The client Docker build forwards both the API URL and Clerk publishable key. The API container receives `CLERK_SECRET_KEY` for server-side token verification.
 
 ## Environment variables
 
