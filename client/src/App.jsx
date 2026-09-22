@@ -2,7 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { ClerkProvider, useAuth } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { setClerkTokenGetter } from './api/axios';
 import api from './api/axios';
 import { updateUser, logout } from './redux/authSlice';
@@ -34,9 +34,9 @@ export function ClerkRouterProvider({ children }) {
   );
 }
 
-function ProtectedRoute({ children }) {
+function ProtectedRoute({ children, isReady }) {
   const { isLoaded, isSignedIn } = useAuth();
-  if (!isLoaded) return <LoadingScreen />;
+  if (!isLoaded || !isReady) return <LoadingScreen />;
   return isSignedIn ? children : <Navigate replace to="/login" />;
 }
 
@@ -52,42 +52,47 @@ function AppRoutes() {
   const { getToken, isSignedIn, isLoaded } = useAuth();
   const dispatch = useDispatch();
   const user = useSelector((state) => state.auth.user);
-  useEffect(() => {
-    if (!isLoaded || !isSignedIn) {
-      setClerkTokenGetter(null);
-      return undefined;
-    }
-    setClerkTokenGetter(() => getToken());
-    return () => setClerkTokenGetter(null);
-  }, [getToken, isLoaded, isSignedIn]);
+  const [isSynced, setIsSynced] = useState(false);
+
   useEffect(() => {
     if (!isLoaded) return undefined;
     if (!isSignedIn) {
       dispatch(logout());
+      setClerkTokenGetter(null);
+      queueMicrotask(() => setIsSynced(true));
       return undefined;
     }
     let active = true;
-    api.get('/users/me').then((res) => {
-      if (!active) return;
-      dispatch(updateUser(res.data));
-      dispatch(fetchUnreadCounts());
-    }).catch((error) => {
-      if (active) console.error('Failed to sync MongoDB user record:', error);
-    });
+    queueMicrotask(() => setIsSynced(false));
+    const initializeSession = async () => {
+      try {
+        setClerkTokenGetter(() => getToken());
+        const token = await getToken();
+        if (!token) throw new Error('Clerk session token was unavailable');
+        const res = await api.get('/users/me');
+        if (!active) return;
+        dispatch(updateUser(res.data));
+        dispatch(fetchUnreadCounts());
+        setIsSynced(true);
+      } catch (error) {
+        if (active) console.error('Failed to sync MongoDB user record:', error);
+      }
+    };
+    initializeSession();
     return () => { active = false; };
-  }, [dispatch, isLoaded, isSignedIn]);
+  }, [dispatch, getToken, isLoaded, isSignedIn]);
 
   return <Routes>
     <Route path="/" element={<Landing />} />
     <Route path="/login/*" element={<PublicAuthRoute><Login /></PublicAuthRoute>} />
     <Route path="/register/*" element={<PublicAuthRoute><Register /></PublicAuthRoute>} />
-    <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-    <Route path="/browse" element={<ProtectedRoute><Browse /></ProtectedRoute>} />
-    <Route path="/bookings" element={<ProtectedRoute><Bookings /></ProtectedRoute>} />
-    <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
-    <Route path="/edit-skills" element={<ProtectedRoute><EditSkills /></ProtectedRoute>} />
-    <Route path="/credits" element={<ProtectedRoute><CreditHistory /></ProtectedRoute>} />
-    <Route path="/admin" element={<ProtectedRoute>{user?.role === 'admin' ? <AdminDashboard /> : <Navigate replace to="/dashboard" />}</ProtectedRoute>} />
+    <Route path="/dashboard" element={<ProtectedRoute isReady={isSynced}><Dashboard /></ProtectedRoute>} />
+    <Route path="/browse" element={<ProtectedRoute isReady={isSynced}><Browse /></ProtectedRoute>} />
+    <Route path="/bookings" element={<ProtectedRoute isReady={isSynced}><Bookings /></ProtectedRoute>} />
+    <Route path="/messages" element={<ProtectedRoute isReady={isSynced}><Messages /></ProtectedRoute>} />
+    <Route path="/edit-skills" element={<ProtectedRoute isReady={isSynced}><EditSkills /></ProtectedRoute>} />
+    <Route path="/credits" element={<ProtectedRoute isReady={isSynced}><CreditHistory /></ProtectedRoute>} />
+    <Route path="/admin" element={<ProtectedRoute isReady={isSynced}>{user?.role === 'admin' ? <AdminDashboard /> : <Navigate replace to="/dashboard" />}</ProtectedRoute>} />
     <Route path="*" element={<Navigate replace to="/dashboard" />} />
   </Routes>;
 }
