@@ -1,6 +1,7 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { useAuth } from '@clerk/clerk-react';
+import { ClerkProvider, useAuth } from '@clerk/clerk-react';
+import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { bindClerkTokenGetter } from './api/axios';
 import api from './api/axios';
@@ -19,6 +20,19 @@ import AdminDashboard from './pages/AdminDashboard';
 import OnboardingModal from './components/OnboardingModal';
 
 function LoadingScreen() { return <div className="loading-screen">Loading workspace...</div>; }
+
+export function ClerkRouterProvider({ children }) {
+  const navigate = useNavigate();
+  return (
+    <ClerkProvider
+      publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY}
+      routerPush={(to) => navigate(to)}
+      routerReplace={(to) => navigate(to, { replace: true })}
+    >
+      {children}
+    </ClerkProvider>
+  );
+}
 
 function ProtectedRoute({ children }) {
   const { isLoaded, isSignedIn } = useAuth();
@@ -72,7 +86,7 @@ function AppRoutes() {
 }
 
 function App() {
-  return <BrowserRouter><AppRoutes /><OnboardingModal /></BrowserRouter>;
+  return <><AppRoutes /><OnboardingModal /></>;
 }
 
 export default App;

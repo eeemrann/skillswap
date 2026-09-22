@@ -1,15 +1,17 @@
 import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
 import { Provider } from 'react-redux';
-import { ClerkProvider } from '@clerk/clerk-react';
 import { store } from './redux/store';
-import App from './App.jsx';
+import App, { ClerkRouterProvider } from './App.jsx';
 import './index.css';
 import './App.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <ClerkProvider publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY}>
-    <Provider store={store}>
-      <App />
-    </Provider>
-  </ClerkProvider>
+  <BrowserRouter>
+    <ClerkRouterProvider>
+      <Provider store={store}>
+        <App />
+      </Provider>
+    </ClerkRouterProvider>
+  </BrowserRouter>
 );

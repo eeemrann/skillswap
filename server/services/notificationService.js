@@ -3,6 +3,7 @@ const Notification = require('../models/Notification');
 const EmailJob = require('../models/EmailJob');
 
 const MAX_EMAIL_ATTEMPTS = 5;
+const CLERK_MANAGED_EMAIL_TYPES = new Set(['EMAIL_VERIFICATION']);
 
 async function notify(type, recipientEmail, data) {
   const serviceUrl = process.env.NOTIFICATION_SERVICE_URL;
@@ -36,6 +37,10 @@ async function notify(type, recipientEmail, data) {
 }
 
 async function queueEmail(type, recipientEmail, data) {
+  if (CLERK_MANAGED_EMAIL_TYPES.has(type)) {
+    console.warn('Email notification was not queued:', { type, reason: 'Clerk manages email verification' });
+    return null;
+  }
   if (!recipientEmail) {
     console.error('Email notification was not queued:', { type, reason: 'recipient email is missing' });
     return null;
