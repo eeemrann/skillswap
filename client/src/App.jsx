@@ -28,7 +28,9 @@ function ProtectedRoute({ children }) {
 
 function PublicAuthRoute({ children }) {
   const { isLoaded, isSignedIn } = useAuth();
-  if (!isLoaded) return null;
+  // Keep the Clerk flow mounted while auth state is loading so transient
+  // state updates do not cancel an in-progress verification step.
+  if (!isLoaded) return children;
   return isSignedIn ? <Navigate replace to="/dashboard" /> : children;
 }
 
