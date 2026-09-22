@@ -4,6 +4,7 @@ import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../redux/authSlice';
 import { clearNotifications, fetchUnreadCounts } from '../redux/notificationSlice';
+import api from '../api/axios';
 import Icon from './Icon';
 
 const links = [
@@ -39,6 +40,30 @@ function AppShell({ children, eyebrow, title, description, action }) {
     document.addEventListener('visibilitychange', refresh);
     return () => { window.clearInterval(timer); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); };
   }, [dispatch]);
+
+  useEffect(() => {
+    const syncLocation = () => {
+      if (document.hidden || !navigator.geolocation) return;
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => {
+          api.patch('/users/me/location', {
+            longitude: coords.longitude,
+            latitude: coords.latitude
+          }).catch(() => {});
+        },
+        () => {},
+        { maximumAge: 600000, timeout: 10000 }
+      );
+    };
+
+    syncLocation();
+    window.addEventListener('online', syncLocation);
+    window.addEventListener('focus', syncLocation);
+    return () => {
+      window.removeEventListener('online', syncLocation);
+      window.removeEventListener('focus', syncLocation);
+    };
+  }, []);
 
   useEffect(() => {
     if (!menuOpen) return undefined;

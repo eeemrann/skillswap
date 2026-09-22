@@ -11,6 +11,13 @@ const cleanSkills = (value) => {
   return [...unique.values()].slice(0, 25);
 };
 
+const validCoordinates = (coordinates) => Array.isArray(coordinates)
+  && coordinates.length === 2
+  && coordinates.every((value) => typeof value === 'number' && Number.isFinite(value))
+  && coordinates[0] >= -180 && coordinates[0] <= 180
+  && coordinates[1] >= -90 && coordinates[1] <= 90
+  && !(coordinates[0] === 0 && coordinates[1] === 0);
+
 // GET the logged-in user's own profile
 exports.getProfile = async (req, res) => {
   try {
@@ -70,11 +77,30 @@ exports.updateProfile = async (req, res) => {
 
 // GET all other users (for browsing skills) — excludes the logged-in user and passwords
 exports.getAllUsers = async (req, res) => {
+  const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
+  const page = Math.max(Number(req.query.page) || 1, 1);
+  const requesterFilter = mongoose.Types.ObjectId.isValid(req.userId)
+    ? { _id: { $ne: new mongoose.Types.ObjectId(req.userId) } }
+    : {};
+  const fallback = () => User.find({ ...requesterFilter, status: { $ne: 'suspended' } })
+    .select('-password').skip((page - 1) * limit).limit(limit).lean();
   try {
-    const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
-    const page = Math.max(Number(req.query.page) || 1, 1);
+    const lng = Number(req.query.lng);
+    const lat = Number(req.query.lat);
+    const hasValidQueryCoordinates = req.query.lng !== undefined && req.query.lat !== undefined
+      && Number.isFinite(lng) && Number.isFinite(lat)
+      && lng >= -180 && lng <= 180 && lat >= -90 && lat <= 90;
+    if (!hasValidQueryCoordinates) return res.status(200).json(await fallback());
+    console.log('Querying near:', [lng, lat], 'Requester ID:', req.userId);
+    const maxDistanceMeters = 25000;
     const users = await User.aggregate([
-      { $match: { _id: { $ne: new mongoose.Types.ObjectId(req.userId) }, status: { $ne: 'suspended' } } },
+      { $geoNear: {
+        near: { type: 'Point', coordinates: [lng, lat] },
+        distanceField: 'distanceMeters', maxDistance: maxDistanceMeters,
+        query: { ...requesterFilter, status: { $ne: 'suspended' }, 'location.type': 'Point', 'location.coordinates': { $exists: true, $ne: [] } },
+        spherical: true
+      } },
+      { $addFields: { distanceKm: { $round: [{ $divide: ['$distanceMeters', 1000] }, 1] } } },
       {
         $lookup: {
           from: 'reviews',           // Mongoose auto-pluralizes the 'Review' model to this collection name
@@ -102,9 +128,43 @@ exports.getAllUsers = async (req, res) => {
       { $skip: (page - 1) * limit },
       { $limit: limit }
     ]);
-    res.json(users);
+    console.log('Found nearby users count:', users.length);
+    if (users.length === 0) {
+      console.log('GeoNear returned 0. Falling back to all active users.');
+      return res.status(200).json(await fallback());
+    }
+    return res.status(200).json(users);
   } catch (err) {
-    res.status(500).json({ message: 'Users could not be loaded' });
+    console.warn('Nearby user lookup unavailable; falling back to all active users:', err.message);
+    try {
+      return res.status(200).json(await fallback());
+    } catch (fallbackError) {
+      console.error('User fallback lookup failed:', fallbackError.message);
+      return res.status(200).json([]);
+    }
+  }
+};
+
+exports.updateCoordinates = async (req, res) => {
+  const { longitude, latitude } = req.body;
+  if (typeof longitude !== 'number' || typeof latitude !== 'number'
+    || !Number.isFinite(longitude) || !Number.isFinite(latitude)
+    || longitude < -180 || longitude > 180 || latitude < -90 || latitude > 90) {
+    return res.status(400).json({ message: 'Valid longitude and latitude are required' });
+  }
+
+  try {
+    const user = await User.findByIdAndUpdate(req.userId, {
+      $set: {
+        'location.type': 'Point',
+        'location.coordinates': [longitude, latitude],
+        'location.lastUpdated': new Date()
+      }
+    }, { new: true, runValidators: true }).select('location');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    return res.json({ location: user.location });
+  } catch (err) {
+    return res.status(400).json({ message: 'Location could not be updated' });
   }
 };
 

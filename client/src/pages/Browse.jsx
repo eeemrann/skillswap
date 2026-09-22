@@ -6,16 +6,34 @@ import Icon from '../components/Icon';
 const initials = (name = '') => name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase();
 
 function Browse() {
-  const [users, setUsers] = useState([]); const [query, setQuery] = useState(''); const [error, setError] = useState(''); const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState([]); const [query, setQuery] = useState(''); const [error, setError] = useState(''); const [loading, setLoading] = useState(true); const [locationActive, setLocationActive] = useState(true);
   const [bookingForm, setBookingForm] = useState(null); const [proposedTime, setProposedTime] = useState(''); const [message, setMessage] = useState(''); const [sending, setSending] = useState(false);
   const [reviewProfile, setReviewProfile] = useState(null); const [reviewsLoading, setReviewsLoading] = useState(false);
   useEffect(() => {
     let active = true;
-    const loadUsers = (initial = false) => {
-      api.get('/users')
-        .then((res) => { if (active) setUsers(res.data); })
-        .catch(() => { if (active) setError('We could not load the community right now.'); })
-        .finally(() => { if (active && initial) setLoading(false); });
+    const loadUsers = async (initial = false) => {
+      try {
+        let locationQuery = '';
+        if (!document.hidden && navigator.geolocation) {
+          const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { maximumAge: 600000, timeout: 10000 }));
+          const { longitude, latitude } = position.coords;
+          await api.patch('/users/me/location', {
+            longitude,
+            latitude
+          });
+          locationQuery = `?lng=${encodeURIComponent(longitude)}&lat=${encodeURIComponent(latitude)}`;
+        }
+        const res = await api.get(`/users${locationQuery}`);
+        console.log('Browse loaded users:', res.data);
+        if (!active) return;
+        const payload = Array.isArray(res.data) ? { users: res.data, locationRequired: false } : res.data;
+        setUsers(payload.users || []);
+        setLocationActive(!payload.locationRequired);
+      } catch (requestError) {
+        if (active) setError(requestError.response?.data?.message || 'We could not load the community right now.');
+      } finally {
+        if (active && initial) setLoading(false);
+      }
     };
     loadUsers(true);
     const refreshOnFocus = () => loadUsers(false);
@@ -25,12 +43,21 @@ function Browse() {
       window.removeEventListener('focus', refreshOnFocus);
     };
   }, []);
+  const enableLocation = () => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(({ coords }) => {
+      api.patch('/users/me/location', { longitude: coords.longitude, latitude: coords.latitude })
+        .then(() => window.dispatchEvent(new Event('focus')))
+        .catch(() => setError('Location could not be updated.'));
+    }, () => setError('Location access is needed to show nearby members.'));
+  };
   const visibleUsers = useMemo(() => users.filter((user) => `${user.name} ${(user.skillsOffered || []).join(' ')} ${(user.skillsWanted || []).join(' ')}`.toLowerCase().includes(query.trim().toLowerCase())), [users, query]);
   const openBookingForm = (providerId, providerName, skill) => { setBookingForm({ providerId, providerName, skill }); setMessage(''); };
   const submitBooking = async (event) => { event.preventDefault(); setSending(true); setError(''); try { const key = crypto.randomUUID(); await api.post('/bookings', { providerId: bookingForm.providerId, skill: bookingForm.skill, proposedTime: new Date(proposedTime).toISOString(), durationMinutes: 60 }, { headers: { 'Idempotency-Key': key } }); setMessage(`Request sent to ${bookingForm.providerName}.`); setBookingForm(null); setProposedTime(''); } catch (err) { setError(err.response?.data?.message || 'Failed to send request.'); } finally { setSending(false); } };
   const showReviews = async (user) => { setReviewProfile({ user, reviews: [], averageRating: user.averageRating || 0, totalReviews: user.reviewCount || 0 }); setReviewsLoading(true); setError(''); try { const { data } = await api.get(`/reviews/${user._id}`); setReviewProfile({ user, ...data }); } catch (err) { setError(err.response?.data?.message || 'Could not load reviews.'); setReviewProfile(null); } finally { setReviewsLoading(false); } };
   return (
     <AppShell eyebrow="Skill marketplace" title="Learn from people, not feeds." description="Discover generous people with practical experience and find your next meaningful exchange." action={<span className="match-score"><Icon name="users" size={14}/>{users.length} members</span>}>
+      <div className="status-message"><span>{locationActive ? '📍 Showing members within 25 km' : '📍 Location access needed to find nearby members'}</span>{!locationActive && <button type="button" className="ghost-button" onClick={enableLocation}>Enable Location</button>}</div>
       {message && <p className="status-message">{message}</p>}{error && <p className="status-message error">{error}</p>}
       <div className="filter-bar"><div className="filter-copy"><strong>Explore the community</strong><small>Search by member, skill, or interest</small></div><div className="search-wrap"><Icon name="search" size={16}/><input className="search-input" aria-label="Search skills or people" placeholder="Try photography, Excel, Spanish..." value={query} onChange={(event) => setQuery(event.target.value)}/>{query && <button type="button" onClick={() => setQuery('')} aria-label="Clear search">&times;</button>}</div></div>
       {loading && <div className="people-grid">{[1,2,3,4,5,6].map((item)=><div className="person-card skeleton-card" key={item}><span/><span/><span/><span/></div>)}</div>}

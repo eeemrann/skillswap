@@ -15,9 +15,11 @@ const userSchema = new mongoose.Schema({
   skillsOffered: [{ type: String, trim: true, maxlength: 80 }],
   skillsWanted: [{ type: String, trim: true, maxlength: 80 }],
   location: {
+    type: { type: String, enum: ['Point'], default: 'Point' },
+    coordinates: { type: [Number], default: undefined },
     city: { type: String, default: '' },
     country: { type: String, default: '' },
-    coordinates: { lat: Number, lng: Number }
+    lastUpdated: { type: Date, default: Date.now }
   },
   timezone: { type: String, default: 'UTC' },
   availability: [{
@@ -28,5 +30,7 @@ const userSchema = new mongoose.Schema({
   creditBalance: { type: Number, default: 5 }, // everyone starts with 5 free credits
   createdAt: { type: Date, default: Date.now }
 });
+
+userSchema.index({ location: '2dsphere' }, { sparse: true });
 
 module.exports = mongoose.model('User', userSchema);
