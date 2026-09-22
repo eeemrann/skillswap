@@ -18,6 +18,15 @@ const validCoordinates = (coordinates) => Array.isArray(coordinates)
   && coordinates[1] >= -90 && coordinates[1] <= 90
   && !(coordinates[0] === 0 && coordinates[1] === 0);
 
+const findUserByAnyId = async (id) => {
+  if (!id) return null;
+  if (mongoose.Types.ObjectId.isValid(id)) {
+    const user = await User.findById(id);
+    if (user) return user;
+  }
+  return User.findOne({ clerkId: id });
+};
+
 // GET the logged-in user's own profile
 exports.getProfile = async (req, res) => {
   try {
@@ -27,17 +36,18 @@ exports.getProfile = async (req, res) => {
       return res.json(user);
     }
 
-    const query = mongoose.Types.ObjectId.isValid(req.userId)
-      ? { _id: req.userId }
-      : { clerkId: req.userId };
-    const user = await User.findOne(query).select('-password');
+    const user = await findUserByAnyId(req.userId || req.clerkUserId);
     if (!user) return res.status(404).json({ message: 'User not found' });
-    return res.json(user);
+    const profile = user.toObject ? user.toObject() : user;
+    delete profile.password;
+    return res.json(profile);
   } catch (err) {
     console.error('[getMe] Error fetching user profile:', err);
     return res.status(500).json({ message: 'Server error retrieving profile' });
   }
 };
+
+exports.getMe = exports.getProfile;
 
 // UPDATE the logged-in user's skills
 exports.updateSkills = async (req, res) => {
@@ -59,27 +69,35 @@ exports.updateSkills = async (req, res) => {
 
 exports.updateProfile = async (req, res) => {
   try {
+    const user = req.user || await findUserByAnyId(req.userId || req.clerkUserId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
     const { bio, timezone, location, availability } = req.body;
-    const cleanAvailability = Array.isArray(availability)
-      ? availability.filter((slot) => slot && slot.day && slot.start && slot.end)
-      : [];
+    if (bio !== undefined) user.bio = typeof bio === 'string' ? bio.trim() : '';
+    if (timezone !== undefined) user.timezone = typeof timezone === 'string' ? timezone.trim() : 'UTC';
+    if (Array.isArray(availability)) user.availability = availability.filter((slot) => slot && slot.day && slot.start && slot.end);
 
-    const user = await User.findByIdAndUpdate(
-      req.userId,
-      {
-        bio: typeof bio === 'string' ? bio.trim() : '',
-        timezone: typeof timezone === 'string' ? timezone.trim() : 'UTC',
-        location: {
-          city: typeof location?.city === 'string' ? location.city.trim() : '',
-          country: typeof location?.country === 'string' ? location.country.trim() : '',
-          coordinates: location?.coordinates
-        },
-        availability: cleanAvailability
-      },
-      { new: true, runValidators: true }
-    ).select('-password');
+    if (location && typeof location === 'object') {
+      const coordinates = location.coordinates;
+      if (coordinates !== undefined && validCoordinates(coordinates)) {
+        user.location = user.location || {};
+        user.location.type = 'Point';
+        user.location.coordinates = [...coordinates];
+      } else if (coordinates !== undefined && coordinates !== null) {
+        return res.status(400).json({ message: 'Location coordinates must be [longitude, latitude]' });
+      }
+      user.location = user.location || {};
+      if (location.city !== undefined) user.location.city = String(location.city).trim();
+      if (location.country !== undefined) user.location.country = String(location.country).trim();
+      if (!validCoordinates(user.location.coordinates)) {
+        user.location.type = undefined;
+        user.location.coordinates = undefined;
+      }
+    }
 
-    res.json(user);
+    const updatedUser = await user.save();
+    const profile = updatedUser.toObject();
+    delete profile.password;
+    return res.json(profile);
   } catch (err) {
     res.status(400).json({ message: 'Profile update failed' });
   }
@@ -187,9 +205,19 @@ exports.updateCompleteProfile = async (req, res) => {
       skillsOffered: cleanSkills(req.body.skillsOffered), skillsWanted: cleanSkills(req.body.skillsWanted),
       bio: typeof bio === 'string' ? bio.trim() : '',
       timezone: typeof timezone === 'string' && timezone.length <= 100 ? timezone.trim() : 'UTC',
-      location: { city: typeof location?.city === 'string' ? location.city.trim().slice(0, 100) : '', country: typeof location?.country === 'string' ? location.country.trim().slice(0, 100) : '' },
       availability: cleanAvailability
     }, { new: true, runValidators: true }).select('-password');
+    if (location && typeof location === 'object') {
+      user.location = user.location || {};
+      if (location.city !== undefined) user.location.city = String(location.city).trim().slice(0, 100);
+      if (location.country !== undefined) user.location.country = String(location.country).trim().slice(0, 100);
+      if (location.coordinates !== undefined) {
+        if (!validCoordinates(location.coordinates)) return res.status(400).json({ message: 'Location coordinates must be [longitude, latitude]' });
+        user.location.type = 'Point';
+        user.location.coordinates = [...location.coordinates];
+      }
+      await user.save();
+    }
     return res.json(user);
   } catch (error) {
     return res.status(400).json({ message: 'Profile update failed' });
