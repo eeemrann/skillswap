@@ -44,23 +44,28 @@ module.exports = async function auth(req, res, next) {
 
         const name = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ')
           || clerkUser.username || 'SkillSwap member';
-        user = await User.findOne({ email: primaryEmail.toLowerCase() });
-        if (user) {
-          user.clerkId = userId;
-          user.authProvider = 'clerk';
-          await user.save();
-        } else {
-          user = await User.create({
-            clerkId: userId,
-            name,
-            email: primaryEmail.toLowerCase(),
-            authProvider: 'clerk',
-            profilePicture: clerkUser.imageUrl || '',
-            creditBalance: 5,
-            skillsOffered: [],
-            skillsWanted: [],
-            status: 'active'
-          });
+        const email = primaryEmail.toLowerCase();
+        try {
+          user = await User.findOneAndUpdate(
+            { email },
+            {
+              $set: { clerkId: userId, authProvider: 'clerk' },
+              $setOnInsert: {
+                name,
+                email,
+                profilePicture: clerkUser.imageUrl || '',
+                creditBalance: 5,
+                skillsOffered: [],
+                skillsWanted: [],
+                status: 'active'
+              }
+            },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+          );
+        } catch (syncError) {
+          if (syncError.code !== 11000) throw syncError;
+          user = await User.findOne({ $or: [{ clerkId: userId }, { email }] });
+          if (!user) throw syncError;
         }
       } catch (syncError) {
         console.error('[Auth Middleware] Error fetching or provisioning Clerk user:', syncError.message);

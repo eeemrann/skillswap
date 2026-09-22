@@ -14,6 +14,7 @@ jest.mock('@clerk/express', () => ({
 
 jest.mock('../models/User', () => ({
   findOne: jest.fn(),
+  findOneAndUpdate: jest.fn(),
   create: jest.fn()
 }));
 
@@ -92,19 +93,22 @@ describe('auth middleware', () => {
       _id: 'user-existing',
       email: 'test@example.com',
       status: 'active',
-      role: 'user',
-      save: jest.fn().mockResolvedValue(true)
+      role: 'user'
     };
 
-    User.findOne
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(existingUser);
+    User.findOne.mockResolvedValueOnce(null);
+    User.findOneAndUpdate.mockResolvedValue(existingUser);
 
     await authMiddleware(req, res, next);
 
-    expect(existingUser.clerkId).toBe('clerk_new_link');
-    expect(existingUser.authProvider).toBe('clerk');
-    expect(existingUser.save).toHaveBeenCalled();
+    expect(User.findOneAndUpdate).toHaveBeenCalledWith(
+      { email: 'test@example.com' },
+      expect.objectContaining({
+        $set: { clerkId: 'clerk_new_link', authProvider: 'clerk' },
+        $setOnInsert: expect.objectContaining({ email: 'test@example.com' })
+      }),
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
     expect(req.userId).toBe('user-existing');
     expect(next).toHaveBeenCalledTimes(1);
   });
@@ -113,7 +117,7 @@ describe('auth middleware', () => {
     getAuth.mockReturnValue({ userId: 'clerk_brand_new' });
 
     User.findOne.mockResolvedValue(null);
-    User.create.mockResolvedValue({
+    User.findOneAndUpdate.mockResolvedValue({
       _id: 'user-new',
       clerkId: 'clerk_brand_new',
       status: 'active',
@@ -122,10 +126,14 @@ describe('auth middleware', () => {
 
     await authMiddleware(req, res, next);
 
-    expect(User.create).toHaveBeenCalledWith(expect.objectContaining({
-      clerkId: 'clerk_brand_new',
-      email: 'test@example.com'
-    }));
+    expect(User.findOneAndUpdate).toHaveBeenCalledWith(
+      { email: 'test@example.com' },
+      expect.objectContaining({
+        $set: { clerkId: 'clerk_brand_new', authProvider: 'clerk' },
+        $setOnInsert: expect.objectContaining({ email: 'test@example.com' })
+      }),
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
     expect(req.userId).toBe('user-new');
     expect(next).toHaveBeenCalledTimes(1);
   });
