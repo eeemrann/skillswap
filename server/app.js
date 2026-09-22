@@ -18,15 +18,30 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const app = express();
 
 app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS || 1));
-const allowedOrigins = (process.env.CLIENT_ORIGINS || process.env.CLIENT_ORIGIN || 'http://localhost:5173,http://localhost:8080,https://skillswap-rho-five.vercel.app')
-  .split(',').map((value) => value.trim()).filter(Boolean);
-app.use(helmet());
-app.use(cors({
+const normalizeOrigin = (value) => value.trim().replace(/\/+$/, '');
+const defaultOrigins = [
+  'https://skillswap-io.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:8080'
+];
+const configuredOrigins = (process.env.CLIENT_ORIGINS || process.env.CLIENT_ORIGIN || '')
+  .split(',')
+  .map(normalizeOrigin)
+  .filter(Boolean);
+const allowedOrigins = [...new Set([...defaultOrigins, ...configuredOrigins])];
+const corsOptions = {
   origin(origin, callback) {
-    if (!origin || !allowedOrigins.length || allowedOrigins.includes(origin)) return callback(null, true);
-    return callback(new Error('Origin is not allowed'));
-  }
-}));
+    if (!origin) return callback(null, true);
+    return callback(null, allowedOrigins.includes(normalizeOrigin(origin)));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'X-Requested-With', 'Accept']
+};
+app.use(helmet());
+app.use(cors(corsOptions));
+// Express 5 requires a named wildcard parameter for a catch-all route.
+app.options('/{*splat}', cors(corsOptions));
 app.use(express.json({ limit: '100kb' }));
 app.use(clerkMiddleware());
 
