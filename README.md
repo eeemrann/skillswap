@@ -1,86 +1,352 @@
 # SkillSwap
 
-SkillSwap is a peer-to-peer skill exchange platform. Members discover people who can teach what they want to learn, request sessions, exchange time credits, message booking partners, and leave reviews.
+SkillSwap is a peer-to-peer skill-exchange platform. Members maintain skills they can teach and skills they want to learn, discover nearby members, request exchanges, message booking partners, transfer time credits when an exchange is completed, and leave reviews.
 
 ## Architecture
 
-```text
-React/Vite client -- Clerk session --> Express API -- MongoDB replica set
-                                      |            \-- Python matching service
-                                      \-- email queue --> Flask notification service --> Resend
+### Runtime topology
+
+```mermaid
+flowchart LR
+    Browser["Browser\nReact 19 + Vite"]
+    Clerk["Clerk\nAuthentication + sessions"]
+    Nginx["Nginx\nSPA static hosting"]
+    API["Express API\nNode 20\n/api"]
+    Mongo[("MongoDB 7\nReplica set rs0")]
+    Match["Matching service\nFlask + Gunicorn\n:6000"]
+    Notify["Notification service\nFlask + Gunicorn\n:7000"]
+    Resend["Resend\nEmail provider"]
+
+    Browser -->|loads SPA| Nginx
+    Browser -->|session token| Clerk
+    Browser -->|Bearer JSON requests| API
+    API -->|verify Clerk session| Clerk
+    API <--> |Mongoose| Mongo
+    API -->|POST /match| Match
+    API -->|queued email delivery| Notify
+    Notify -->|HTTPS email API| Resend
 ```
 
-| Directory | Purpose | Default port |
-|---|---|---:|
-| `client` | React 19/Vite single-page application | `5173` |
-| `server` | Express REST API and email queue worker | `5000` |
-| `matching-service` | Flask recommendation service | `6000` |
-| `notification-service` | Authenticated Flask email delivery service | `7000` |
+| Component | Directory | Technology | Port |
+|---|---|---|---:|
+| Web client | `client/` | React 19, Vite, React Router, Redux Toolkit, Clerk | 5173 |
+| API | `server/` | Node 20, Express 5, Mongoose, Clerk middleware | 5000 |
+| Matching | `matching-service/` | Python 3.11, Flask, Gunicorn | 6000 |
+| Notifications | `notification-service/` | Python 3.11, Flask, Gunicorn, Resend API | 7000 |
+| Database | Docker/Atlas | MongoDB 7 replica set | 27017 |
 
-MongoDB must run as a replica set because completing a booking uses a multi-document transaction.
+MongoDB must support replica-set transactions because booking completion transfers credits and writes several documents atomically.
+
+### Authentication lifecycle
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as Browser
+    participant C as Clerk
+    participant A as React Axios client
+    participant API as Express API
+    participant DB as MongoDB
+
+    U->>C: Sign in with email OTP or OAuth
+    C-->>U: Authenticated session
+    U->>A: Request protected resource
+    A->>C: getToken()
+    C-->>A: Bearer session token
+    A->>API: HTTP request with Authorization header
+    API->>C: clerkMiddleware verifies session
+    API->>DB: Find user by clerkId
+    alt First authenticated request
+        API->>C: Fetch profile and primary email
+        API->>DB: Upsert User with clerkId and 5 starter credits
+    end
+    DB-->>API: User record
+    API-->>A: JSON response
+    A-->>U: Render protected page
+```
+
+Clerk is the active identity provider. The API middleware attaches `req.userId`, `req.userRole`, `req.clerkUserId`, and `req.user`, and rejects suspended users. The client mounts `BrowserRouter` above `ClerkProvider` and passes React Router navigation callbacks into Clerk.
+
+### Discovery and matching
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant B as Browse page
+    participant API as Express API
+    participant DB as MongoDB
+    participant D as Dashboard
+    participant M as Matching service
+
+    B->>B: Request browser geolocation
+    B->>API: PATCH /api/users/me/location
+    API->>DB: Save GeoJSON [longitude, latitude]
+    B->>API: GET /api/users?lng=&lat=
+    API->>DB: $geoNear with maxDistance 25,000 m
+    DB-->>API: Nearby active users with distanceKm
+    API-->>B: Browse cards or active-user fallback
+
+    D->>API: GET /api/matches
+    API->>DB: Load current user and candidates
+    API->>M: POST /match with skills, availability, locations
+    alt Matcher available
+        M-->>API: Ranked recommendations
+    else Matcher unavailable or times out
+        API->>API: Run equivalent local scorer
+    end
+    API-->>D: Ranked matches
+```
+
+The match score is `skill overlap + 0.25 availability overlap + 0.25 location match`. When both locations have valid two-number coordinate arrays, the matcher uses the haversine formula and a 25 km limit. If either side lacks valid coordinates, it falls back to case-insensitive city equality. Coordinates are always GeoJSON `[longitude, latitude]`. Reasons are `Within 25km` or `Same location` respectively.
+
+### Booking, credits, notifications, and email
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant L as Learner
+    participant API as Express API
+    participant DB as MongoDB
+    participant P as Provider
+    participant N as Notification service
+    participant R as Resend
+
+    L->>API: POST /api/bookings + Idempotency-Key
+    API->>DB: Validate provider, skill, time, and conflicts
+    API->>DB: Create pending Booking
+    API->>DB: Create in-app Notification
+    API->>DB: Queue EmailJob
+    API-->>L: 201 pending booking
+    N-->>DB: Claim ready EmailJob
+    N->>R: POST /emails
+    R-->>N: Delivery result
+    N-->>DB: Mark sent, retry pending, or dead
+    P->>API: PATCH /api/bookings/:id/status
+    API->>DB: Accept or decline pending booking
+    L->>API: PATCH /api/bookings/:id/complete
+    API->>DB: Transaction: debit learner, credit provider, insert Transaction, complete Booking
+    API-->>L: Completed booking
+```
 
 ## Features
 
 - Clerk email OTP and OAuth authentication.
-- React Router-aware Clerk navigation for multi-step sign-in and sign-up.
-- First-time onboarding for skills wanted and skills offered.
+- First-login profile provisioning and skills onboarding.
 - Five starting time credits for new profiles.
-- Skill, location, and availability-based matching.
-- Booking requests with conflict checks and idempotency protection.
-- Atomic credit transfers when a booking is completed.
-- Booking-gated messaging, notifications, and reviews.
+- Skill, availability, and 25 km coordinate-aware matching.
+- Browse discovery using MongoDB `$geoNear` with a safe active-user fallback.
+- Booking idempotency and overlap/conflict protection.
+- Atomic one-credit transfer when a booking is completed.
+- Booking-gated messaging, in-app notifications, and reviews.
 - Admin analytics, review moderation, and user suspension controls.
-- Backend protection against administrators suspending themselves.
-- Durable booking email jobs with retries and expiry.
-- Location-aware discovery: Browse requests the browser location and searches within 25 km.
-
-Clerk owns email verification. SkillSwap does not send verification OTPs; its notification service sends only booking-related messages.
+- Durable booking email jobs with retries, backoff, dead status, and TTL cleanup.
 
 ## Repository structure
 
 ```text
 skillswap/
-├── client/                 React/Vite frontend
-│   ├── src/api/            Axios API client
-│   ├── src/components/     Shared UI and onboarding modal
-│   ├── src/pages/          Application pages
-│   └── src/redux/          Auth and notification state
-├── server/                 Express API
-│   ├── controllers/        Request handlers
-│   ├── middleware/         Clerk authentication and admin checks
-│   ├── models/             Mongoose models
-│   ├── routes/             API routes
-│   ├── services/           Matching integration and email worker
-│   ├── scripts/            Admin and maintenance utilities
-│   └── tests/              Jest tests
-├── matching-service/       Flask matching microservice
-├── notification-service/   Flask/Resend notification microservice
-├── docker-compose.yml      Local orchestration
+├── client/
+│   ├── src/api/              Axios client and Clerk token injection
+│   ├── src/components/       App shell, auth, onboarding, icons
+│   ├── src/pages/            Landing, auth, dashboard, browse, bookings, messages, admin
+│   ├── src/redux/            Auth and notification state
+│   ├── Dockerfile             Vite build served by Nginx
+│   └── nginx.conf              SPA fallback routing
+├── server/
+│   ├── app.js                 Express middleware, route mounting, health endpoint
+│   ├── server.js              MongoDB connection and HTTP bootstrap
+│   ├── controllers/           API handlers and business rules
+│   ├── middleware/            Clerk authentication and admin authorization
+│   ├── models/                Mongoose schemas and indexes
+│   ├── routes/                `/api` route modules
+│   ├── services/              Email queue worker and notification integration
+│   ├── scripts/               Admin and maintenance commands
+│   └── tests/                 Jest tests
+├── matching-service/          Flask scoring service and unittest suite
+├── notification-service/      Authenticated Flask/Resend email service
+├── docker-compose.yml         Local orchestration
+├── .github/workflows/ci.yml   Node, Python, frontend, and Compose checks
 └── README.md
 ```
 
-## Prerequisites
+Generated dependencies, build output, virtual environments, caches, binaries, and local `.env` files are not application source and should not be committed.
 
-- Node.js 20 or newer
-- Python 3.11 or newer
-- MongoDB 6 or newer configured as a replica set, or MongoDB Atlas
-- A Clerk application with publishable and secret keys
-- A Resend account if booking email delivery is required
+## Data model
+
+```mermaid
+erDiagram
+    USER ||--o{ BOOKING : requests
+    USER ||--o{ BOOKING : provides
+    USER ||--o{ TRANSACTION : pays
+    USER ||--o{ TRANSACTION : receives
+    BOOKING ||--o| TRANSACTION : settles
+    BOOKING ||--o{ REVIEW : receives
+    USER ||--o{ REVIEW : writes
+    USER ||--o{ REVIEW : receives
+    USER ||--o{ MESSAGE : sends
+    USER ||--o{ MESSAGE : receives
+    BOOKING ||--o{ MESSAGE : gates
+    USER ||--o{ NOTIFICATION : receives
+
+    USER {
+        ObjectId id PK
+        string clerkId UK
+        string email UK
+        string role
+        string status
+        string[] skillsOffered
+        string[] skillsWanted
+        object location
+        int creditBalance
+    }
+    BOOKING {
+        ObjectId id PK
+        ObjectId requester FK
+        ObjectId provider FK
+        string skill
+        date proposedTime
+        int durationMinutes
+        string status
+        string idempotencyKey
+    }
+    TRANSACTION {
+        ObjectId id PK
+        ObjectId from FK
+        ObjectId to FK
+        ObjectId booking FK
+        int amount
+    }
+    REVIEW {
+        ObjectId id PK
+        ObjectId booking FK
+        ObjectId reviewer FK
+        ObjectId reviewee FK
+        int rating
+    }
+    MESSAGE {
+        ObjectId id PK
+        ObjectId sender FK
+        ObjectId recipient FK
+        ObjectId booking FK
+        string body
+        date readAt
+    }
+    NOTIFICATION {
+        ObjectId id PK
+        ObjectId userId FK
+        string type
+        ObjectId relatedId
+        boolean read
+    }
+    EMAIL_JOB {
+        ObjectId id PK
+        string type
+        string recipientEmail
+        string status
+        int attempts
+        date nextAttemptAt
+    }
+```
+
+Important indexes and invariants:
+
+- `User.location` has a sparse `2dsphere` index.
+- `Booking(requester, idempotencyKey)` is unique when an idempotency key exists.
+- Booking conflict queries cover both participants and pending/accepted time ranges.
+- `Transaction.booking` is unique, preventing duplicate credit settlement.
+- `Review(booking, reviewer)` is unique, preventing duplicate reviews by one participant.
+- Notifications expire after 90 days; email jobs expire at `expiresAt`.
+
+## API reference
+
+The API is mounted under `/api`. Protected routes require a Clerk session token. Express also applies Helmet, CORS allowlisting, a 100 KB JSON limit, and a 15-minute/20-request authentication rate limiter.
+
+### Public and compatibility endpoints
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/` | API status text |
+| `GET` | `/health` | Database-aware health (`200` or `503`) |
+| `POST` | `/api/auth/logout` | Protected compatibility logout endpoint |
+
+### Users and discovery
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/users/me` | Current profile |
+| `PUT` | `/api/users/me` | Complete profile update |
+| `PUT` | `/api/users/me/skills` | Update wanted/offered skills |
+| `PUT` | `/api/users/me/profile` | Update profile fields |
+| `PATCH` | `/api/users/me/location` | Save browser coordinates |
+| `GET` | `/api/users?lng=&lat=` | Browse active users, preferring 25 km GeoNear results |
+| `GET` | `/api/matches` | Ranked recommendations |
+
+### Exchanges
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/bookings` | Current user’s paginated bookings |
+| `POST` | `/api/bookings` | Create request; requires `Idempotency-Key` |
+| `PATCH` | `/api/bookings/:id/status` | Provider accepts or declines |
+| `PATCH` | `/api/bookings/:id/complete` | Requester completes and transfers one credit |
+| `GET` | `/api/credits/history` | Credit transactions |
+| `POST` | `/api/reviews` | Review a completed booking |
+| `GET` | `/api/reviews/mine` | Current user’s reviewable bookings |
+| `GET` | `/api/reviews/:userId` | Reviews for a user |
+| `GET` | `/api/reviews/user/:userId` | Backwards-compatible review alias |
+| `GET` | `/api/messages/unread` | Unread message count |
+| `GET` | `/api/messages/:userId` | Booking-gated conversation |
+| `POST` | `/api/messages/:userId` | Send booking-gated message |
+
+### Notifications and administration
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/notifications` | Current user’s notifications |
+| `GET` | `/api/notifications/unread-count` | Unread counts by type |
+| `PATCH` | `/api/notifications/:id/read` | Mark one notification read |
+| `PATCH` | `/api/notifications/read` | Mark a notification type/all read |
+| `GET` | `/api/admin/stats` | Platform counters |
+| `GET` | `/api/admin/users` | Moderation list |
+| `PATCH` | `/api/admin/users/:id/status` | Suspend or restore a user |
+| `DELETE` | `/api/admin/reviews/:id` | Delete a review |
+
+## Frontend routes
+
+| Route | Access | Page |
+|---|---|---|
+| `/` | Public | Landing page |
+| `/login/*` | Public | Clerk sign-in |
+| `/register/*` | Public | Clerk sign-up |
+| `/dashboard` | Protected | Recommendations and activity |
+| `/browse` | Protected | Location-aware member discovery |
+| `/bookings` | Protected | Booking workflow and reviews |
+| `/messages` | Protected | Booking-gated messages |
+| `/edit-skills` | Protected | Profile, skills, location, availability |
+| `/credits` | Protected | Credit history |
+| `/admin` | Admin | Platform moderation and statistics |
 
 ## Local development
 
-### MongoDB
+### Prerequisites
 
-For a local replica set:
+- Node.js 20 or newer
+- Python 3.11 or newer
+- MongoDB 6+ with replica-set support, or MongoDB Atlas
+- Clerk publishable and secret keys
+- Resend account and verified sender for real email delivery
+
+### Start with Docker Compose
 
 ```bash
-mongod --replSet rs0 --dbpath /path/to/data
-mongosh
+docker compose up --build
 ```
 
-Then run `rs.initiate()` once. MongoDB Atlas supports replica-set transactions by default.
+Default addresses: client `http://localhost:8080`, API `http://localhost:5000`, matcher `http://localhost:6000`, notifications `http://localhost:7000`, and MongoDB `localhost:27017`.
 
-### API
+### Run services separately
+
+API:
 
 ```bash
 cd server
@@ -89,19 +355,7 @@ cp .env.example .env
 npm run dev
 ```
 
-Configure at least:
-
-```env
-MONGO_URI=mongodb://localhost:27017/skillswap?replicaSet=rs0
-CLERK_SECRET_KEY=sk_test_replace_me
-PORT=5000
-CLIENT_ORIGINS=http://localhost:5173
-MATCHING_SERVICE_URL=http://localhost:6000
-NOTIFICATION_SERVICE_URL=http://localhost:7000
-NOTIFICATION_SERVICE_API_KEY=local-shared-secret
-```
-
-### Client
+Client:
 
 ```bash
 cd client
@@ -110,160 +364,111 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Configure `client/.env.local`:
-
-```env
-VITE_API_URL=http://localhost:5000/api
-VITE_CLERK_PUBLISHABLE_KEY=pk_test_replace_me
-```
-
-Open <http://localhost:5173>. `BrowserRouter` sits above `ClerkProvider`, and Clerk receives React Router `routerPush`/`routerReplace` callbacks so OTP steps stay inside the SPA.
-
-### Matching service
+Matching service:
 
 ```bash
 cd matching-service
 python -m venv venv
-# Windows: venv\Scripts\activate
+# Windows PowerShell: .\venv\Scripts\Activate.ps1
 # macOS/Linux: source venv/bin/activate
 pip install -r requirements.txt
 python app.py
 ```
 
-It exposes `GET /` and `POST /match`. The API has an internal fallback if this service is unavailable.
-
-### Notification service
+Notification service:
 
 ```bash
 cd notification-service
 python -m venv venv
-# Windows: venv\Scripts\activate
+# Windows PowerShell: .\venv\Scripts\Activate.ps1
 # macOS/Linux: source venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
 python app.py
 ```
 
-Configure:
-
-```env
-PORT=7000
-RESEND_API_KEY=re_replace_me
-EMAIL_FROM=SkillSwap <onboarding@resend.dev>
-NOTIFICATION_SERVICE_API_KEY=local-shared-secret
-```
-
-Supported email types are `BOOKING_CREATED`, `BOOKING_ACCEPTED`, `BOOKING_DECLINED`, and `BOOKING_COMPLETED`.
-
-## Docker Compose
-
-```bash
-docker compose up --build
-```
-
-Default addresses:
-
-- Client: <http://localhost:8080>
-- API: <http://localhost:5000>
-- Matching service: <http://localhost:6000>
-- Notification service: <http://localhost:7000>
-- MongoDB: `localhost:27017`, replica set `rs0`
-
-Compose reads these root-level variables when provided:
-
-```env
-RESEND_API_KEY=re_replace_me
-EMAIL_FROM=SkillSwap <onboarding@resend.dev>
-LOCAL_NOTIFICATION_SERVICE_API_KEY=local-shared-secret
-LOCAL_JWT_SECRET=legacy-local-secret
-GOOGLE_CLIENT_ID=
-VITE_API_URL=http://localhost:5000/api
-VITE_CLERK_PUBLISHABLE_KEY=pk_test_replace_me
-CLERK_SECRET_KEY=sk_test_replace_me
-```
-
-The client Docker build forwards both the API URL and Clerk publishable key. The API container receives `CLERK_SECRET_KEY` for server-side token verification.
+For a manual MongoDB replica set, start `mongod --replSet rs0 --dbpath /path/to/data`, connect with `mongosh`, and run `rs.initiate()` once. The API connection string should include `?replicaSet=rs0`.
 
 ## Environment variables
 
-### Client (`client/.env.local`)
+### Client: `client/.env.local`
 
 | Variable | Required | Description |
 |---|---:|---|
-| `VITE_API_URL` | Yes | API base URL, ending in `/api` |
+| `VITE_API_URL` | Yes outside local defaults | API base URL, normally ending in `/api` |
 | `VITE_CLERK_PUBLISHABLE_KEY` | Yes | Clerk browser publishable key |
 
-### API (`server/.env`)
+### API: `server/.env`
 
 | Variable | Required | Description |
 |---|---:|---|
 | `MONGO_URI` | Yes | MongoDB replica-set connection string |
-| `CLERK_SECRET_KEY` | Yes | Clerk server secret for `@clerk/express` |
+| `CLERK_SECRET_KEY` | Yes | Clerk server verification secret |
 | `PORT` | No | Defaults to `5000` |
 | `CLIENT_ORIGINS` | No | Comma-separated allowed browser origins |
-| `MATCHING_SERVICE_URL` | No | Matching service URL |
-| `MATCHING_SERVICE_TIMEOUT_MS` | No | Matching request timeout |
-| `NOTIFICATION_SERVICE_URL` | No | Notification service URL |
-| `NOTIFICATION_SERVICE_API_KEY` | No | Shared API/service secret |
-| `NOTIFICATION_SERVICE_TIMEOUT_MS` | No | Notification request timeout |
-| `EMAIL_WORKER_INTERVAL_MS` | No | Queue polling interval; defaults to `5000` ms |
-| `TRUST_PROXY_HOPS` | No | Reverse-proxy hop count |
-| `BLOCKED_EMAIL_DOMAINS` | No | Additional domains for legacy auth validation |
+| `MATCHING_SERVICE_URL` | No | Defaults to `http://localhost:6000` |
+| `MATCHING_SERVICE_TIMEOUT_MS` | No | Matcher timeout; defaults to `60000` |
+| `NOTIFICATION_SERVICE_URL` | No | Notification service base URL |
+| `NOTIFICATION_SERVICE_API_KEY` | No | Shared API-to-service secret |
+| `NOTIFICATION_SERVICE_TIMEOUT_MS` | No | Defaults to `10000` |
+| `EMAIL_WORKER_INTERVAL_MS` | No | Queue polling interval; defaults to `5000` |
+| `TRUST_PROXY_HOPS` | No | Express proxy trust setting |
+| `BLOCKED_EMAIL_DOMAINS` | Legacy/optional | Retained for older auth configuration |
 
-### Notification service (`notification-service/.env`)
+### Notification service: `notification-service/.env`
 
 | Variable | Required | Description |
 |---|---:|---|
-| `RESEND_API_KEY` | Yes for delivery | Resend API key |
-| `EMAIL_FROM` | Yes for delivery | Verified sender address |
+| `RESEND_API_KEY` | For delivery | Resend API key |
+| `EMAIL_FROM` | For delivery | Verified sender identity |
 | `NOTIFICATION_SERVICE_API_KEY` | Yes | Must match the API secret |
 | `PORT` | No | Defaults to `7000` |
 
-Never commit `.env`, `.env.local`, Clerk secret keys, database credentials, or Resend keys.
+Never commit `.env`, `.env.local`, Clerk secret keys, database credentials, or Resend keys. `VITE_*` values are compiled into browser assets; only the Clerk publishable key belongs there.
 
-## Authentication and onboarding flow
+## Security and reliability
 
-1. The user authenticates with Clerk using email OTP or a configured OAuth provider.
-2. Clerk navigates within React Router using `routerPush`/`routerReplace`.
-3. The first authenticated API request runs Clerk sync middleware, which links or creates the MongoDB `User` record.
-4. The client fetches `GET /api/users/me` and stores the profile in Redux.
-5. If both `skillsWanted` and `skillsOffered` are empty, `OnboardingModal` appears.
-6. Saving calls `PUT /api/users/me/skills`, updates Redux, and navigates to `/dashboard`.
-7. Clerk, not the API or notification service, sends verification codes.
+- Clerk is the source of authentication truth; MongoDB stores application profile and role data.
+- Missing/invalid sessions and suspended users are rejected before protected handlers run.
+- CORS is allowlisted, credentials are enabled, Helmet is enabled, and request JSON is capped at 100 KB.
+- Booking creation requires an 8–100 character idempotency key and has a matching unique database constraint.
+- Providers can update only their own pending bookings; requesters alone can complete accepted bookings.
+- Completion updates credits, transaction, and booking status inside one MongoDB transaction.
+- Messaging requires a valid booking connection and rejects invalid IDs and self-messaging.
+- The notification service uses constant-time shared-key comparison on `X-Notification-Key`.
+- Clerk owns verification email; the application queue handles booking lifecycle messages only.
+- Matching failure is isolated by the local equivalent scorer; email failure is asynchronous and retried.
+- Remove temporary authentication debug logging from `server/app.js`, `server/middleware/authMiddleware.js`, and `client/src/api/axios.js` before production.
 
-## Location-aware discovery
+## Testing and checks
 
-The Browse page requests browser geolocation when available, saves it through `PATCH /api/users/me/location`, and then requests `GET /api/users?lng=<longitude>&lat=<latitude>`. Coordinates are always stored in GeoJSON order: `[longitude, latitude]`.
+These are the checks run by CI:
 
-The `User.location` field uses a sparse MongoDB `2dsphere` index. With valid coordinates, the API uses `$geoNear` with a 25,000-meter maximum distance and returns `distanceKm` for each nearby member. Suspended users and the requester are excluded. Members without valid location data are excluded from the geospatial result.
+```bash
+cd server
+npm ci
+npm test
 
-If location permission is unavailable, query coordinates are invalid, the geospatial index is unavailable, or no nearby users are found, the API returns a safe `200` response containing non-suspended users as a compatibility fallback. The Browse page keeps cards visible even when a member has no listed skills.
+cd ../client
+npm ci
+npm run lint
+npm run build
 
-## API overview
+cd ../matching-service
+python -m pip install -r requirements.txt
+python -m unittest -v
 
-Protected routes require a Clerk session token. The API is mounted under `/api`.
+cd ../notification-service
+python -m pip install -r requirements.txt
+python -m unittest -v
 
-| Area | Routes |
-|---|---|
-| Users | `GET /users?lng=<longitude>&lat=<latitude>`, `GET /users/me`, `PATCH /users/me/location`, `PUT /users/me`, `PUT /users/me/skills`, `PUT /users/me/profile` |
-| Bookings | `GET /bookings`, `POST /bookings`, `PATCH /bookings/:id/status`, `PATCH /bookings/:id/complete` |
-| Credits | `GET /credits/history` |
-| Matching | `GET /matches` |
-| Reviews | `POST /reviews`, `GET /reviews/mine`, `GET /reviews/:userId`, `GET /reviews/user/:userId` |
-| Messages | `GET /messages/unread`, `GET /messages/:userId`, `POST /messages/:userId` |
-| Notifications | `GET /notifications`, `GET /notifications/unread-count`, `PATCH /notifications/:id/read`, `PATCH /notifications/read` |
-| Admin | `GET /admin/stats`, `GET /admin/users`, `PATCH /admin/users/:id/status`, `DELETE /admin/reviews/:id` |
-| Health | `GET /health` |
+cd ..
+docker compose config
+```
 
-The admin status endpoint accepts `active` or `suspended`. An administrator cannot suspend their own account; the backend enforces this independently of the dashboard UI.
+The matcher tests cover availability overlap, the `/match` contract, invalid candidates, coordinates within 25 km, coordinates beyond 25 km despite equal city names, and city fallback when coordinates are missing. Jest covers authentication, admin protection, booking validation/creation, matcher fallback, messaging validation, and notification integration. Notification tests cover health, service-key enforcement, and missing provider configuration.
 
-## Email queue
-
-Booking notifications are persisted as `EmailJob` documents. The API worker claims pending jobs, calls the notification service, retries failures with backoff, and marks permanently failed jobs as `dead`. MongoDB TTL indexes remove expired jobs.
-
-Verification email jobs are explicitly rejected because Clerk owns that flow.
-
-## Admin and maintenance commands
+## Operational commands
 
 Promote a user to admin:
 
@@ -272,40 +477,20 @@ cd server
 node scripts/makeAdmin.js user@example.com
 ```
 
-Remove legacy email-verification fields and jobs from an older database:
+Remove legacy email-verification fields and jobs:
 
 ```bash
 npm run migrate:remove-email-verification
 ```
 
-## Testing and checks
-
-```bash
-cd server
-npm test -- --runInBand
-
-cd ../client
-npm run lint
-npm run build
-
-cd ../matching-service
-python -m unittest -v
-
-cd ../notification-service
-python -m unittest -v
-
-cd ..
-docker compose config
-```
-
 ## Deployment notes
 
-- Deploy `client` as a Vite static site with `VITE_API_URL` and `VITE_CLERK_PUBLISHABLE_KEY` set at build time.
-- Deploy `server` with `npm ci` and `node server.js`; provide `MONGO_URI`, `CLERK_SECRET_KEY`, allowed client origins, and service URLs.
-- Deploy the matching and notification services separately or use their Dockerfiles.
-- Use a MongoDB replica set in production.
+- Deploy `client` as a static Vite/Nginx site with `VITE_API_URL` and `VITE_CLERK_PUBLISHABLE_KEY` set at build time.
+- Deploy `server` with `npm ci` and `node server.js`; provide MongoDB, Clerk, CORS, matcher, and notification configuration.
+- Deploy both Flask services with their Dockerfiles or Gunicorn.
+- Use MongoDB Atlas or another real replica set in production; a standalone MongoDB cannot support completion transactions.
 - Configure Clerk redirect URLs and allowed origins for the deployed client.
-- Use a verified Resend sender and strong, separate service secrets.
+- Use a verified Resend sender and separate, randomly generated service secrets.
 
 ## Attribution
 
