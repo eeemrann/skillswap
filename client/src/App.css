@@ -49,3 +49,157 @@
   .auth-panel { padding-inline: 10px; }
   .auth-form-wrap { padding-inline: 2px; }
 }
+
+/* Final responsive hardening: keep every layout usable from 320px phones to wide displays. */
+@media (hover: none) and (pointer: coarse) {
+  .app-nav-link:hover,
+  .conversation-person:hover,
+  .match-card:hover,
+  .person-card:hover,
+  .booking-card:hover,
+  .stat-card:hover,
+  .landing-primary:hover,
+  .primary-button:hover {
+    transform: none;
+  }
+
+  .app-nav-link,
+  .conversation-person,
+  .icon-button,
+  .primary-button,
+  .secondary-button,
+  .ghost-button,
+  .danger-button,
+  .booking-actions button,
+  .booking-actions a {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@media (max-width: 479px) {
+  .page-wrap {
+    padding-inline: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-bottom: max(48px, env(safe-area-inset-bottom));
+  }
+
+  .mobile-header {
+    padding-left: max(10px, env(safe-area-inset-left));
+    padding-right: max(10px, env(safe-area-inset-right));
+  }
+
+  .mobile-header .app-brand {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .mobile-header .brand-word {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .page-heading h1 {
+    max-width: 100%;
+    font-size: clamp(27px, 9vw, 34px);
+    overflow-wrap: anywhere;
+  }
+
+  .page-description,
+  .person-bio,
+  .booking-meta,
+  .notification-item,
+  .empty-state {
+    overflow-wrap: anywhere;
+  }
+
+  .surface-pad,
+  .conversation-panel {
+    padding: 16px;
+  }
+
+  .match-card {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 15px;
+  }
+
+  .match-score {
+    align-self: flex-start;
+  }
+
+  .booking-actions {
+    width: 100%;
+  }
+
+  .booking-actions button,
+  .booking-actions a {
+    flex: 1 1 120px;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .message-composer {
+    align-items: stretch;
+  }
+
+  .message-composer .primary-button {
+    flex: 0 0 auto;
+    padding-inline: 13px;
+  }
+
+  .modal-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .booking-modal {
+    max-height: min(94svh, 720px);
+    border-radius: 22px 22px 0 0;
+    padding: 26px 16px max(20px, env(safe-area-inset-bottom));
+  }
+
+  .booking-modal .stack-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .booking-modal .stack-actions > * {
+    width: 100%;
+  }
+}
+
+@media (min-width: 1440px) {
+  .page-wrap {
+    padding-inline: clamp(48px, 5vw, 96px);
+  }
+
+  .content-grid {
+    gap: 28px;
+  }
+}
+
+@media (max-height: 620px) and (orientation: landscape) {
+  .mobile-header {
+    padding-block: 7px;
+  }
+
+  .page-wrap {
+    padding-top: 22px;
+  }
+
+  .page-heading {
+    margin-bottom: 20px;
+  }
+
+  .modal-backdrop {
+    align-items: flex-start;
+    overflow-y: auto;
+    padding-block: 10px;
+  }
+
+  .booking-modal,
+  .review-modal {
+    max-height: calc(100svh - 20px);
+  }
+}
