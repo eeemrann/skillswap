@@ -9,10 +9,28 @@ const hasAvailabilityOverlap = (first = [], second = []) => {
   return first.some((a) => second.some((b) => a.day === b.day && a.start < b.end && b.start < a.end));
 };
 
-const hasLocationOverlap = (first = {}, second = {}) => {
+const validCoordinates = (coordinates) => (
+  Array.isArray(coordinates) && coordinates.length === 2 &&
+  coordinates.every((coordinate) => typeof coordinate === 'number' && Number.isFinite(coordinate))
+);
+
+const haversineDistanceKm = (first, second) => {
+  const toRadians = (degrees) => degrees * Math.PI / 180;
+  const deltaLat = toRadians(second[1] - first[1]);
+  const deltaLng = toRadians(second[0] - first[0]);
+  const lat1 = toRadians(first[1]);
+  const lat2 = toRadians(second[1]);
+  const a = Math.sin(deltaLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLng / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+const locationMatch = (first = {}, second = {}) => {
+  if (validCoordinates(first.coordinates) && validCoordinates(second.coordinates)) {
+    return { matched: haversineDistanceKm(first.coordinates, second.coordinates) <= 25, source: 'coordinates' };
+  }
   const firstCity = String(first?.city || '').trim().toLowerCase();
   const secondCity = String(second?.city || '').trim().toLowerCase();
-  return Boolean(firstCity && secondCity && firstCity === secondCity);
+  return { matched: Boolean(firstCity && secondCity && firstCity === secondCity), source: 'city' };
 };
 
 const matchLocally = (me, candidates) => {
@@ -23,7 +41,8 @@ const matchLocally = (me, candidates) => {
     if (!overlap.length) return null;
 
     const availabilityOverlap = hasAvailabilityOverlap(me.availability, candidate.availability);
-    const locationOverlap = hasLocationOverlap(me.location, candidate.location);
+    const locationResult = locationMatch(me.location, candidate.location);
+    const locationOverlap = locationResult.matched;
     return {
       id: candidate.id,
       name: candidate.name,
@@ -32,7 +51,7 @@ const matchLocally = (me, candidates) => {
       matchReasons: [
         ...overlap.map((skill) => `Offers ${skill}`),
         ...(availabilityOverlap ? ['Availability overlaps'] : []),
-        ...(locationOverlap ? ['Same location'] : [])
+        ...(locationOverlap ? [locationResult.source === 'coordinates' ? 'Within 25km' : 'Same location'] : [])
       ]
     };
   }).filter(Boolean).sort((first, second) => second.score - first.score);

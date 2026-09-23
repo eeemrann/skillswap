@@ -1,4 +1,5 @@
 
+import math
 import os
 
 from flask import Flask, request, jsonify
@@ -35,7 +36,7 @@ def match():
 
         if score > 0:
             availability_overlap = availability_score(my_availability, candidate.get('availability', []))
-            location_overlap = location_match(my_location, candidate.get('location', {}))
+            location_overlap, location_result = location_match(my_location, candidate.get('location', {}) or {})
             weighted_score = score + (0.25 if availability_overlap else 0) + (0.25 if location_overlap else 0)
             results.append({
                 "id": candidate.get('id'),
@@ -45,7 +46,8 @@ def match():
                 "matchReasons": [
                     *[f"Offers {skill}" for skill in overlap],
                     *(["Availability overlaps"] if availability_overlap else []),
-                    *(["Same location"] if location_overlap else [])
+                    *(["Within 25km"] if location_overlap and location_result == "coordinates" else []),
+                    *(["Same location"] if location_overlap and location_result == "city" else [])
                 ]
             })
 
@@ -59,10 +61,30 @@ def availability_score(first, second):
     second_slots = [slot for slot in second if isinstance(slot, dict)]
     return any(a.get('day') == b.get('day') and a.get('start', '') < b.get('end', '') and b.get('start', '') < a.get('end', '') for a in first_slots for b in second_slots)
 
+def valid_coordinates(coordinates):
+    return (
+        isinstance(coordinates, list) and len(coordinates) == 2
+        and all(isinstance(coordinate, (int, float)) and math.isfinite(coordinate) for coordinate in coordinates)
+    )
+
+
+def haversine_distance_km(first, second):
+    longitude_1, latitude_1 = map(math.radians, first)
+    longitude_2, latitude_2 = map(math.radians, second)
+    delta_latitude = latitude_2 - latitude_1
+    delta_longitude = longitude_2 - longitude_1
+    a = (math.sin(delta_latitude / 2) ** 2
+         + math.cos(latitude_1) * math.cos(latitude_2) * math.sin(delta_longitude / 2) ** 2)
+    return 6371 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
 def location_match(first, second):
+    if valid_coordinates(first.get('coordinates')) and valid_coordinates(second.get('coordinates')):
+        return haversine_distance_km(first['coordinates'], second['coordinates']) <= 25, 'coordinates'
+
     first_city = str(first.get('city', '')).strip().lower()
     second_city = str(second.get('city', '')).strip().lower()
-    return bool(first_city and second_city and first_city == second_city)
+    return bool(first_city and second_city and first_city == second_city), 'city'
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 6000))
