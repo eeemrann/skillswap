@@ -339,3 +339,366 @@
     max-height: calc(100svh - 20px);
   }
 }
+
+/* Compact-tablet pass: make intermediate widths behave like a comfortable app,
+   while retaining the full sidebar on larger laptop and desktop screens. */
+.content-grid > *,
+.two-column > *,
+.profile-editor > *,
+.section-heading > *,
+.page-heading > *,
+.filter-bar > *,
+.booking-card > *,
+.messages-layout > *,
+.auth-page > * {
+  min-width: 0;
+}
+
+.page-wrap,
+.surface,
+.booking-card,
+.person-card,
+.match-card,
+.conversation-panel,
+.conversation-list,
+.auth-panel,
+.auth-story {
+  overflow-wrap: anywhere;
+}
+
+.primary-button,
+.secondary-button,
+.ghost-button,
+.danger-button,
+.booking-actions button,
+.booking-actions a,
+.message-composer button,
+.modal-close,
+.sidebar-close,
+.mobile-header .icon-button {
+  min-height: 44px;
+}
+
+@media (min-width: 761px) and (max-width: 1180px) {
+  .page-wrap {
+    padding-inline: clamp(22px, 3.5vw, 42px);
+  }
+
+  .page-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 18px 24px;
+  }
+
+  .page-heading-action {
+    margin-left: auto;
+  }
+
+  .section-heading {
+    flex-wrap: wrap;
+  }
+
+  .section-heading > :last-child {
+    margin-left: auto;
+  }
+
+  .stat-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .upcoming-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .people-grid {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+
+  .booking-card {
+    grid-template-columns: minmax(0, 1fr) minmax(170px, auto);
+  }
+
+  .booking-side {
+    min-width: 170px;
+  }
+
+  .booking-actions {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 900px) {
+  .sidebar {
+    left: -286px;
+    width: min(286px, 88vw);
+  }
+
+  .sidebar.open {
+    left: 0;
+  }
+
+  .sidebar-close {
+    display: grid;
+  }
+
+  .sidebar-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 25;
+    display: block;
+    border: 0;
+    background: rgba(22, 18, 48, .35);
+    backdrop-filter: blur(3px);
+  }
+
+  .app-main {
+    margin-left: 0;
+  }
+
+  .mobile-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    align-items: center;
+    padding: max(10px, env(safe-area-inset-top)) 16px 10px;
+    border-bottom: 1px solid rgba(232, 231, 239, .8);
+    background: rgba(255, 255, 255, .88);
+    backdrop-filter: blur(18px);
+  }
+
+  .mobile-header .app-brand {
+    justify-self: center;
+    min-width: 0;
+    max-width: 100%;
+    font-size: 18px;
+  }
+
+  .mobile-header .brand-word {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .page-wrap {
+    padding-top: clamp(28px, 6vw, 44px);
+    padding-bottom: max(54px, env(safe-area-inset-bottom));
+  }
+
+  .two-column,
+  .profile-editor,
+  .landing-hero,
+  .auth-page {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-preview {
+    position: static;
+  }
+
+  .auth-story {
+    min-height: auto;
+  }
+
+  .auth-panel {
+    min-height: 55svh;
+  }
+}
+
+@media (min-width: 601px) and (max-width: 900px) {
+  .page-heading h1 {
+    font-size: clamp(32px, 5vw, 44px);
+  }
+
+  .stat-row,
+  .upcoming-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filter-bar,
+  .browse-toolbar {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .filter-bar .search-wrap {
+    flex: 1 1 280px;
+  }
+
+  .filter-bar .filter-copy,
+  .browse-toolbar .status-message {
+    flex: 1 1 100%;
+  }
+
+  .messages-layout {
+    min-height: 0;
+  }
+
+  .conversation-list {
+    max-height: 420px;
+    overflow-y: auto;
+  }
+
+  .booking-card {
+    grid-template-columns: 1fr;
+  }
+
+  .booking-side {
+    align-items: flex-start;
+  }
+
+  .booking-actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 600px) {
+  .page-wrap {
+    padding-inline: max(14px, env(safe-area-inset-left));
+    padding-right: max(14px, env(safe-area-inset-right));
+  }
+
+  .section-heading,
+  .page-heading,
+  .filter-bar,
+  .browse-toolbar,
+  .recommendation-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .section-heading > :last-child,
+  .page-heading-action,
+  .filter-bar > *,
+  .browse-toolbar > *,
+  .recommendation-actions > * {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .section-heading > a,
+  .page-heading-action > *,
+  .recommendation-actions > a {
+    justify-content: center;
+  }
+
+  .stat-row,
+  .upcoming-grid,
+  .form-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .people-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .messages-layout {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .conversation-list {
+    display: flex;
+    max-width: 100%;
+    align-items: center;
+    gap: 7px;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .conversation-person {
+    min-width: 190px;
+  }
+
+  .conversation-panel {
+    min-height: 0;
+    padding: 16px;
+  }
+
+  .message-stream {
+    min-height: 260px;
+    max-height: none;
+  }
+
+  .message-bubble {
+    max-width: 90%;
+  }
+
+  .message-composer {
+    position: sticky;
+    bottom: 0;
+    align-items: stretch;
+    background: #fff;
+  }
+
+  .message-composer input {
+    min-width: 0;
+  }
+
+  .booking-card {
+    grid-template-columns: 1fr;
+  }
+
+  .booking-side,
+  .booking-actions {
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .booking-actions button,
+  .booking-actions a {
+    flex: 1 1 120px;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .modal-backdrop {
+    align-items: end;
+    padding: 0;
+  }
+
+  .booking-modal,
+  .review-modal {
+    width: 100%;
+    max-height: 94svh;
+    border-radius: 22px 22px 0 0;
+    padding: 26px 16px max(20px, env(safe-area-inset-bottom));
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 380px) {
+  .page-wrap {
+    padding-inline: 12px;
+  }
+
+  .mobile-header {
+    grid-template-columns: 40px minmax(0, 1fr) 40px;
+    padding-inline: 10px;
+  }
+
+  .mobile-header .brand-word {
+    display: none;
+  }
+
+  .page-heading h1 {
+    font-size: 29px;
+  }
+
+  .surface-pad,
+  .conversation-panel,
+  .form-section {
+    padding-inline: 15px;
+  }
+
+  .message-composer {
+    gap: 6px;
+  }
+
+  .message-composer .primary-button {
+    min-width: 62px;
+    padding-inline: 11px;
+  }
+}
