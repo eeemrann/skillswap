@@ -1,9 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useSearchParams } from 'react-router-dom';
 import AppShell from '../components/AppShell';
+import Icon from '../components/Icon';
 import api from '../api/axios';
 import { fetchUnreadCounts } from '../redux/notificationSlice';
+
+const initials = (name = '') => name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase();
+const entityId = (entity) => typeof entity === 'string' ? entity : entity?._id;
 
 function Messages() {
   const currentUser = useSelector((state) => state.auth.user);
@@ -15,88 +19,74 @@ function Messages() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [messages, setMessages] = useState([]);
   const [body, setBody] = useState('');
-  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const scrollRef = useRef(null);
 
-  const loadMessages = useCallback(async (targetUserId, isSilent = false, isActive = () => true) => {
-    const id = targetUserId || userId;
-    if (!id) return;
+  const loadMessages = useCallback(async (targetId, silent = false, isActive = () => true) => {
+    if (!targetId) return;
     try {
-      if (!isSilent) setLoadingMessages(true);
-      const res = await api.get(`/messages/${id}`);
-      if (isActive()) { setMessages(res.data); setMessage(''); dispatch(fetchUnreadCounts()); }
-    } catch (err) {
-      if (isActive()) setMessage(err.response?.data?.message || 'Could not load messages.');
-    } finally {
-      if (!isSilent && isActive()) setLoadingMessages(false);
-    }
-  }, [dispatch, userId]);
+      if (!silent) setLoadingMessages(true);
+      const { data } = await api.get(`/messages/${targetId}`);
+      if (isActive()) { setMessages(data); setError(''); dispatch(fetchUnreadCounts()); }
+    } catch (err) { if (isActive()) setError(err.response?.data?.message || 'Could not load this conversation.'); }
+    finally { if (!silent && isActive()) setLoadingMessages(false); }
+  }, [dispatch]);
 
   useEffect(() => {
     let active = true;
-    api.get('/bookings').then((res) => {
+    api.get('/bookings').then(({ data }) => {
       if (!active) return;
+      const ownId = currentUser?._id || currentUser?.id;
       const connected = new Map();
-      res.data.filter((booking) => ['accepted', 'completed'].includes(booking.status)).forEach((booking) => {
-        const ownId = currentUser?._id || currentUser?.id;
-        const other = booking.provider?._id === ownId ? booking.requester : booking.requester?._id === ownId ? booking.provider : null;
-        if (other?._id) connected.set(other._id, { id: other._id, name: other.name || 'Member' });
+      data.filter((booking) => ['accepted', 'completed'].includes(booking.status)).forEach((booking) => {
+        const providerId = entityId(booking.provider);
+        const requesterId = entityId(booking.requester);
+        const other = providerId === ownId ? booking.requester : requesterId === ownId ? booking.provider : null;
+        if (entityId(other)) connected.set(entityId(other), { id: entityId(other), name: other.name || 'Member' });
       });
-      const list = Array.from(connected.values());
-      setConnections(list); setUserId((current) => current || list[0]?.id || '');
-    }).catch((err) => { if (active) setMessage(err.response?.data?.message || 'Could not load your booking connections.'); })
-      .finally(() => { if (active) setLoadingConnections(false); });
+      const list = [...connected.values()];
+      setConnections(list);
+      setUserId((current) => list.some((item) => item.id === current) ? current : list[0]?.id || '');
+    }).catch((err) => active && setError(err.response?.data?.message || 'Could not load your exchange partners.'))
+      .finally(() => active && setLoadingConnections(false));
     return () => { active = false; };
   }, [currentUser?._id, currentUser?.id]);
 
   useEffect(() => {
     if (!userId) return undefined;
     let active = true;
-    const refresh = () => {
-      if (!document.hidden && active) loadMessages(userId, true, () => active);
-    };
-
-    queueMicrotask(() => {
-      if (!active) return;
-      setMessages([]);
-      loadMessages(userId, false, () => active);
-    });
-    const intervalId = window.setInterval(refresh, 3000);
+    queueMicrotask(() => active && loadMessages(userId, false, () => active));
+    const refresh = () => { if (!document.hidden && active) loadMessages(userId, true, () => active); };
+    const timer = window.setInterval(refresh, 5000);
     window.addEventListener('focus', refresh);
-    return () => {
-      active = false;
-      window.clearInterval(intervalId);
-      window.removeEventListener('focus', refresh);
-    };
-  }, [userId, loadMessages]);
+    return () => { active = false; window.clearInterval(timer); window.removeEventListener('focus', refresh); };
+  }, [loadMessages, userId]);
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages]);
 
   const sendMessage = async (event) => {
-    event.preventDefault(); const cleanBody = body.trim(); if (!cleanBody) return;
-    try { await api.post(`/messages/${userId}`, { body: cleanBody }); setBody(''); await loadMessages(userId); setMessage('Message sent.'); dispatch(fetchUnreadCounts()); }
-    catch (err) { setMessage(err.response?.data?.message || 'Message could not be sent.'); }
+    event.preventDefault();
+    const cleanBody = body.trim();
+    if (!cleanBody || !userId) return;
+    try {
+      await api.post(`/messages/${userId}`, { body: cleanBody });
+      setBody(''); setError('');
+      await loadMessages(userId, true);
+    } catch (err) { setError(err.response?.data?.message || 'Message could not be sent.'); }
   };
 
-  return (
-    <AppShell eyebrow="Your conversations" title="Keep the exchange human." description="Message people you are connected with through an accepted booking.">
-      <div className="messages-layout surface">
-        <aside className="conversation-list"><p className="section-kicker">Conversations</p>
-          {loadingConnections && <p className="form-hint">Loading connected members...</p>}
-          {!loadingConnections && connections.length === 0 && <div className="empty-state"><strong>No conversations yet</strong>Accept a booking to start messaging.</div>}
-          {connections.map((connection) => <button key={connection.id} type="button" className={`conversation-person ${userId === connection.id ? 'active' : ''}`} onClick={() => setUserId(connection.id)}><span className="avatar">{connection.name.slice(0, 2).toUpperCase()}</span><span><strong>{connection.name}</strong><small>SkillSwap member</small></span></button>)}
-        </aside>
-        <section className="conversation-panel">
-          {message && <p className={`status-message ${message === 'Message sent.' ? '' : 'error'}`} role="status">{message}</p>}
-          {!userId ? <div className="empty-state"><strong>Select a conversation</strong>Choose a member to start chatting.</div> : <>
-            <div className="message-stream" aria-live="polite">
-              {loadingMessages && messages.length === 0 && <p className="form-hint">Loading conversation...</p>}
-              {!loadingMessages && messages.length === 0 && <div className="empty-state"><strong>No messages yet</strong>Say hello to start the conversation.</div>}
-              {messages.map((item) => { const ownId = currentUser?._id || currentUser?.id; return <div className={`message-bubble ${item.sender === ownId || item.sender?._id === ownId ? 'mine' : ''}`} key={item._id}><p>{item.body}</p><small>{new Date(item.createdAt).toLocaleString()}</small></div>; })}
-            </div>
-            <form onSubmit={sendMessage} className="message-composer"><label className="sr-only" htmlFor="message-body">Write a message</label><input id="message-body" value={body} onChange={(event) => setBody(event.target.value)} placeholder="Write a message..." maxLength="2000" required /><button className="primary-button" type="submit" disabled={!body.trim()}>Send</button></form>
-          </>}
-        </section>
-      </div>
-    </AppShell>
-  );
+  const activeConnection = connections.find((connection) => connection.id === userId);
+  const ownId = currentUser?._id || currentUser?.id;
+
+  return <AppShell eyebrow="Messenger" title="Direct exchange" description="Focused conversations with the people in your learning network.">
+    {error && <p className="status-message error" role="alert">{error}</p>}
+    <div className="communication-hub">
+      <aside className="conversation-rail"><header><span>Conversations</span><small>{connections.length}</small></header><div className="conversation-rail-list">{loadingConnections && <div className="conversation-loading">Loading partners…</div>}{!loadingConnections && connections.length === 0 && <div className="conversation-empty"><Icon name="message" size={20}/><strong>No conversations yet</strong><span>Accept a booking to begin messaging.</span></div>}{connections.map((connection) => <button type="button" className={userId === connection.id ? 'active' : ''} key={connection.id} onClick={() => { setMessages([]); setUserId(connection.id); }}><span className="conversation-avatar">{initials(connection.name)}</span><span><strong>{connection.name}</strong><small><i/> Active partner</small></span></button>)}</div></aside>
+      <section className="chat-workspace">{!userId ? <div className="chat-placeholder"><Icon name="message" size={24}/><strong>Select a conversation</strong><span>Choose an exchange partner from the sidebar.</span></div> : <><header className="chat-header"><span className="conversation-avatar">{initials(activeConnection?.name)}</span><div><strong>{activeConnection?.name || 'Exchange partner'}</strong><small>Direct conversation</small></div></header><div className="chat-stream" ref={scrollRef} aria-live="polite">{loadingMessages && messages.length === 0 && <div className="chat-loading">Loading conversation…</div>}{!loadingMessages && messages.length === 0 && <div className="chat-placeholder compact"><strong>Start the conversation</strong><span>Share context about your upcoming exchange.</span></div>}{messages.map((message) => { const isMine = entityId(message.sender) === ownId; return <div className={`chat-message ${isMine ? 'mine' : ''}`} key={message._id}><div>{message.body}</div><time>{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></div>; })}</div><form className="command-composer" onSubmit={sendMessage}><label className="sr-only" htmlFor="message-body">Write a message</label><input id="message-body" value={body} onChange={(event) => setBody(event.target.value)} placeholder={`Message ${activeConnection?.name || 'your partner'}…`} maxLength="2000" required/><button className="primary-button" type="submit" disabled={!body.trim()}>Send <Icon name="arrow" size={14}/></button></form></>}</section>
+    </div>
+  </AppShell>;
 }
 
 export default Messages;

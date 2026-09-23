@@ -1,17 +1,27 @@
 export const authAppearance = {
-  variables: { colorPrimary: '#7357e8', colorBackground: '#ffffff', colorInputBackground: '#fbfaff', colorInputText: '#17152b', colorText: '#17152b', colorTextSecondary: '#77758a', borderRadius: '16px', fontFamily: 'DM Sans, sans-serif' },
+  variables: {
+    colorPrimary: '#6366f1',
+    colorText: '#0a0a0a',
+    colorTextSecondary: '#737373',
+    colorBackground: '#ffffff',
+    colorInputBackground: '#fafafa',
+    colorInputText: '#0a0a0a',
+    borderRadius: '8px',
+    fontFamily: 'Inter, sans-serif'
+  },
   elements: {
     rootBox: { width: '100%', maxWidth: '100%' },
-    card: { width: '100%', maxWidth: '100%', boxSizing: 'border-box', background: '#ffffff', border: '1px solid #e8e7ef', boxShadow: '0 14px 40px rgba(33, 25, 75, 0.08)', borderRadius: '16px', padding: 'clamp(16px, 4vw, 32px)' },
+    cardBox: { width: '100%', boxShadow: 'none' },
+    card: { width: '100%', maxWidth: '100%', boxSizing: 'border-box', boxShadow: 'none', border: 'none', padding: '0' },
     headerTitle: { display: 'none' },
     headerSubtitle: { display: 'none' },
-    formFieldLabel: { color: '#4d4a61', fontSize: '0.875rem' },
-    formFieldInput: { width: '100%', maxWidth: '100%', boxSizing: 'border-box', background: '#fbfaff', border: '1px solid #e8e7ef', color: '#17152b', borderRadius: '12px' },
-    socialButtonsBlockButton: { width: '100%', maxWidth: '100%', boxSizing: 'border-box', marginInline: 0, background: '#ffffff', border: '1px solid #e8e7ef', color: '#17152b', borderRadius: '999px' },
-    formButtonPrimary: { background: 'linear-gradient(135deg, #7357e8, #6042d2)', color: '#ffffff', borderRadius: '999px', boxShadow: '0 8px 20px rgba(115, 87, 232, 0.24)' },
-    footer: { background: '#ffffff', borderTop: '1px solid #e8e7ef' },
-    footerActionLink: { color: '#6042d2' },
-    dividerLine: { background: '#e8e7ef' },
-    dividerText: { color: '#77758a' }
+    formFieldLabel: { color: '#404040', fontSize: '12px', fontWeight: '600' },
+    formFieldInput: { width: '100%', boxSizing: 'border-box', minHeight: '44px', background: '#fafafa', border: '1px solid #eaeaea', color: '#0a0a0a', borderRadius: '8px', boxShadow: 'none' },
+    socialButtonsBlockButton: { width: '100%', minHeight: '44px', boxSizing: 'border-box', marginInline: 0, border: '1px solid #eaeaea', borderRadius: '8px', background: '#ffffff', color: '#0a0a0a', boxShadow: 'none', '&:hover': { backgroundColor: '#fafafa' } },
+    formButtonPrimary: { minHeight: '44px', borderRadius: '8px', backgroundColor: '#0a0a0a', boxShadow: 'none', '&:hover': { backgroundColor: '#171717' } },
+    footer: { background: 'transparent' },
+    footerActionLink: { color: '#6366f1', fontWeight: '600' },
+    dividerLine: { background: '#eaeaea' },
+    dividerText: { color: '#737373' }
   }
 };

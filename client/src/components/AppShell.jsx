@@ -17,7 +17,7 @@ const links = [
 ];
 
 export function Brand() {
-  return <><span className="brand-mark"><span /></span><span className="brand-word">Skill<span>Swap</span></span></>;
+  return <><span className="brand-mark-new"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2 2 7l10 5 10-5-10-5Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/></svg></span><span className="brand-word">SKILLSWAP</span></>;
 }
 
 const initials = (name = '') => name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'SS';
@@ -85,7 +85,7 @@ function AppShell({ children, eyebrow, title, description, action }) {
 
   return (
     <div className="app-frame">
-      <aside className={`sidebar ${menuOpen ? 'open' : ''}`}>
+      <aside className={`sidebar sidebar-premium ${menuOpen ? 'open' : ''}`}>
         <div className="sidebar-head">
   <Link className="app-brand" to="/dashboard" aria-label="SkillSwap home">
     <Brand />

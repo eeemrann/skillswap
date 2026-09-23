@@ -1,12 +1,12 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap');
 
 :root {
-  --brand-50:#f2f0ff; --brand-100:#e7e2ff; --brand-200:#d3caff; --brand-400:#8b72f6; --brand-500:#7357e8; --brand-600:#6042d2; --brand-700:#4c34aa;
-  --ink:#17152b; --ink-soft:#3e3b55; --muted:#77758a; --subtle:#a3a1b0; --canvas:#f7f7fb; --surface:#fff; --surface-2:#fbfaff; --line:#e8e7ef; --line-strong:#dcd9e8;
+  --brand-50:#eef2ff; --brand-100:#e0e7ff; --brand-200:#c7d2fe; --brand-400:#818cf8; --brand-500:#6366f1; --brand-600:#4f46e5; --brand-700:#4338ca;
+  --ink:#0a0a0a; --ink-soft:#404040; --muted:#737373; --subtle:#a3a3a3; --canvas:#fff; --surface:#fff; --surface-2:#fafafa; --line:#eaeaea; --line-strong:#d4d4d4;
   --success:#168467; --success-soft:#e8f7f1; --warning:#a66b13; --warning-soft:#fff6df; --danger:#c4485b; --danger-soft:#fff0f2; --accent:#ff7d61;
-  --shadow-sm:0 1px 2px rgba(22,18,48,.04),0 5px 14px rgba(22,18,48,.035); --shadow-md:0 14px 40px rgba(33,25,75,.08); --shadow-lg:0 28px 80px rgba(33,25,75,.14);
-  --radius-sm:10px; --radius-md:16px; --radius-lg:22px; --radius-xl:30px;
-  font-family:'DM Sans',sans-serif; color:var(--ink); background:var(--canvas); font-synthesis:none; text-rendering:optimizeLegibility; -webkit-font-smoothing:antialiased;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.05); --shadow-md:0 12px 24px -10px rgba(0,0,0,.12); --shadow-lg:0 40px 64px -12px rgba(0,0,0,.18);
+  --radius-sm:6px; --radius-md:10px; --radius-lg:14px; --radius-xl:20px;
+  font-family:'Inter',sans-serif; color:var(--ink); background:var(--canvas); font-synthesis:none; text-rendering:optimizeLegibility; -webkit-font-smoothing:antialiased;
 }
 
 html, body, #root { max-width: 100%; overflow-x: hidden; }

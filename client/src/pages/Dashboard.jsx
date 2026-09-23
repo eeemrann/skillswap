@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { useAuth } from '@clerk/clerk-react';
 import { Link } from 'react-router-dom';
 import api from '../api/axios';
@@ -7,95 +7,84 @@ import AppShell from '../components/AppShell';
 import Icon from '../components/Icon';
 import { updateUser } from '../redux/authSlice';
 import { fetchNotifications, fetchUnreadCounts, markNotificationRead } from '../redux/notificationSlice';
-import { SEARCH_RADIUS_OPTIONS, setRadiusKm } from '../redux/searchRadiusSlice';
 
 const initials = (name = '') => name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase();
 
 function Dashboard() {
   const user = useSelector((state) => state.auth.user);
   const authToken = useSelector((state) => state.auth.token);
+  const radiusKm = useSelector((state) => state.searchRadius.radiusKm);
   const { isLoaded, isSignedIn } = useAuth();
   const { items: notifications, loading: notificationsLoading } = useSelector((state) => state.notifications);
-  const radiusKm = useSelector((state) => state.searchRadius.radiusKm);
   const dispatch = useDispatch();
   const [matches, setMatches] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const mountedRef = useRef(true);
-
-  // Clerk supplies the actual request token through the Axios interceptor;
-  // the fallback keeps this refresh active for Clerk sessions before Redux
-  // has a legacy token value.
   const token = authToken || (isSignedIn ? 'clerk-session' : null);
 
-  const refreshDashboard = useCallback(async (isInitial = false) => {
+  const refreshDashboard = useCallback(async (initial = false) => {
     if (!token) return;
-    if (isInitial) setLoading(true);
-
+    if (initial) setLoading(true);
     const [userResult, matchResult, bookingResult] = await Promise.allSettled([
       api.get('/users/me'),
       api.get(`/matches?radiusKm=${encodeURIComponent(radiusKm)}`),
       api.get('/bookings')
     ]);
-
     if (!mountedRef.current) return;
     if (userResult.status === 'fulfilled') dispatch(updateUser(userResult.value.data));
     if (matchResult.status === 'fulfilled') setMatches(matchResult.value.data);
     if (bookingResult.status === 'fulfilled') setBookings(bookingResult.value.data);
-    if (isInitial) setLoading(false);
+    if (initial) setLoading(false);
   }, [dispatch, radiusKm, token]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return undefined;
     mountedRef.current = true;
     queueMicrotask(() => refreshDashboard(true));
-    const refreshWhenVisible = () => {
-      if (!document.hidden) refreshDashboard(false);
-    };
-    const intervalId = window.setInterval(refreshWhenVisible, 10000);
+    const refreshWhenVisible = () => { if (!document.hidden) refreshDashboard(false); };
+    const timer = window.setInterval(refreshWhenVisible, 15000);
     window.addEventListener('focus', refreshWhenVisible);
     dispatch(fetchNotifications());
     dispatch(fetchUnreadCounts());
-    return () => {
-      mountedRef.current = false;
-      window.clearInterval(intervalId);
-      window.removeEventListener('focus', refreshWhenVisible);
-    };
+    return () => { mountedRef.current = false; window.clearInterval(timer); window.removeEventListener('focus', refreshWhenVisible); };
   }, [dispatch, isLoaded, isSignedIn, refreshDashboard]);
 
   const upcoming = bookings.filter((item) => ['pending', 'accepted'].includes(item.status)).slice(0, 3);
   const completed = bookings.filter((item) => item.status === 'completed').length;
+  const profileSignals = [user?.bio, user?.skillsOffered?.length, user?.skillsWanted?.length, user?.location?.city];
+  const profileScore = Math.round((profileSignals.filter(Boolean).length / profileSignals.length) * 100);
+  const matchPercent = (score) => Math.min(100, Math.round((Number(score || 0) / Math.max(user?.skillsWanted?.length || 1, 1)) * 100));
+  const greeting = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening';
 
   return (
-    <AppShell eyebrow="Workspace overview" title={`Welcome back, ${user?.name?.split(' ')[0] || 'there'}.`} description="Everything you need to keep learning, teaching, and building momentum." action={<Link className="primary-button" to="/browse">Explore skills <Icon name="arrow" size={16}/></Link>}>
-      <div className="content-grid dashboard-grid">
-        <div className="stat-row">
-          <div className="stat-card"><small>Available credits</small><strong>{user?.creditBalance ?? 0} <em>hours</em></strong></div>
-          <div className="stat-card"><small>Recommended matches</small><strong>{loading ? '...' : matches.length}</strong></div>
-          <div className="stat-card"><small>Completed exchanges</small><strong>{loading ? '...' : completed}</strong></div>
-        </div>
-        <div className="content-grid two-column">
-          <section className="surface surface-pad">
-            <div className="section-heading"><div><p className="section-kicker">Recommended for you</p><h2>People worth meeting</h2><small className="match-radius-note">Location scoring: {radiusKm === 'worldwide' ? 'Worldwide' : `Within ${radiusKm}km`}</small></div><div className="recommendation-actions"><label className="radius-control"><span>Radius</span><select value={radiusKm} onChange={(event) => dispatch(setRadiusKm(event.target.value === 'worldwide' ? 'worldwide' : Number(event.target.value)))} aria-label="Match search radius">{SEARCH_RADIUS_OPTIONS.map((option) => <option value={option} key={option}>{option === 'worldwide' ? 'Worldwide' : `${option}km`}</option>)}</select></label><Link to="/browse">View all <Icon name="arrow" size={14}/></Link></div></div>
-            {loading && <div className="recommendation-loading" aria-label="Loading recommendations">{[1, 2, 3].map((item) => <div className="recommendation-skeleton" key={item}><span /><div><i /><i /></div></div>)}</div>}
-            {!loading && matches.length > 0 && <div className="match-reasons-summary">{matches.slice(0, 4).map((match) => <span key={match.id || match._id}><strong>{match.name}:</strong> {match.matchReasons?.join(' · ') || 'Skill overlap'}</span>)}</div>}
-            {!loading && matches.length === 0 && <div className="recommendation-empty"><span className="recommendation-spark" aria-hidden="true">✨</span><h3>No recommendations yet</h3><p>Complete your profile by adding:</p><ul><li>Skills you want to learn</li><li>Skills you can teach</li></ul><p>We&apos;ll find skill exchange partners for you.</p><Link className="primary-button" to="/edit-skills">Complete Profile <Icon name="arrow" size={15}/></Link></div>}
-            {!loading && <div className="match-list">{matches.slice(0, 4).map((match) => <article className="match-card" key={match.id || match._id}><div className="match-person"><span className="avatar avatar-small">{initials(match.name)}</span><div><h3>{match.name}</h3><p>{match.matchedSkills?.join(' · ') || 'A promising skill overlap'}</p></div></div><span className="match-score">{match.score || 'New'} match</span></article>)}</div>}
-          </section>
-          <aside className="surface surface-pad profile-card"><p className="section-kicker">Your profile</p><span className="profile-avatar">{initials(user?.name)}</span><h2>{user?.name || 'Your profile'}</h2><p>{user?.skillsOffered?.length ? `${user.skillsOffered.length} skills ready to share with the community.` : 'Add your strengths so the right learners can find you.'}</p><div className="credit-balance"><small>Time credit balance</small><strong>{user?.creditBalance ?? 0} <span>credits</span></strong></div><Link className="secondary-button" to="/edit-skills">Improve profile <Icon name="arrow" size={15}/></Link></aside>
-        </div>
-        <section className="surface surface-pad">
-          <div className="section-heading"><div><p className="section-kicker">Your schedule</p><h2>Upcoming exchanges</h2></div><Link to="/bookings">Manage bookings <Icon name="arrow" size={14}/></Link></div>
-          {!loading && upcoming.length === 0 ? <div className="empty-state"><strong>Your calendar is open</strong>Discover a teacher and request your first session.</div> : <div className="upcoming-grid">{upcoming.map((booking) => <article className="upcoming-card" key={booking._id}><span className={`booking-status ${booking.status}`}>{booking.status}</span><h3>{booking.skill}</h3><p>{new Date(booking.proposedTime).toLocaleString()}</p></article>)}</div>}
+    <AppShell eyebrow="Overview" title={`${greeting}, ${user?.name?.split(' ')[0] || 'there'}.`} description="Your exchanges, opportunities, and community activity at a glance." action={<Link className="primary-button" to="/browse">Discover skills <Icon name="arrow" size={16}/></Link>}>
+      <div className="dashboard-container">
+        <section className="bento-card bento-kpi bento-kpi-featured col-4"><div className="kpi-container"><span className="kpi-label">Available balance</span><span className="kpi-value">{user?.creditBalance ?? 0}</span><span className="kpi-sub">Credit hours ready to use</span></div><Icon name="wallet" size={20}/></section>
+        <section className="bento-card bento-kpi col-4"><div className="kpi-container"><span className="kpi-label">Potential matches</span><span className="kpi-value">{loading ? '—' : matches.length}</span><span className="kpi-sub">Based on your learning goals</span></div><Icon name="users" size={20}/></section>
+        <section className="bento-card bento-kpi col-4"><div className="kpi-container"><span className="kpi-label">Completed swaps</span><span className="kpi-value">{loading ? '—' : completed}</span><span className="kpi-sub">Your total learning history</span></div><Icon name="spark" size={20}/></section>
+
+        <section className="bento-card col-8">
+          <div className="section-eyebrow">Recommended experts</div>
+          {loading ? <div className="bento-loading">Finding the strongest skill overlaps…</div> : <div className="expert-list">{matches.slice(0, 4).map((match) => <Link className="expert-row lift" to={`/profile/${match.id || match._id}`} key={match.id || match._id}><span className="expert-avatar">{initials(match.name)}</span><span className="expert-copy"><strong>{match.name}</strong><small>{match.matchedSkills?.join(' • ') || 'Promising skill overlap'}</small></span><span className="match-percent">{matchPercent(match.score)}% match</span><Icon name="arrow" size={15}/></Link>)}</div>}
+          {!loading && matches.length === 0 && <div className="bento-empty"><Icon name="spark" size={22}/><strong>No expert matches yet</strong><span>Add the skills you want to learn to unlock recommendations.</span><Link to="/edit-skills">Complete your profile</Link></div>}
+          {matches.length > 0 && <Link className="bento-text-link" to="/browse">Explore all members <Icon name="arrow" size={14}/></Link>}
         </section>
-        <section className="surface surface-pad">
-          <div className="section-heading"><div><p className="section-kicker">Recent activity</p><h2>Notifications</h2></div></div>
-          {notificationsLoading && <p className="form-hint">Loading activity...</p>}
-          {!notificationsLoading && notifications.length === 0 && <div className="empty-state"><strong>You are all caught up</strong>Booking, message, review, and credit updates will appear here.</div>}
-          <div className="notification-list">{notifications.slice(0, 8).map((notification) => <button className={`notification-item ${notification.read ? '' : 'unread'}`} type="button" key={notification._id} onClick={() => { if (!notification.read) dispatch(markNotificationRead(notification._id)); }}><span className="notification-dot"/><span><strong>{notification.message}</strong><small>{new Date(notification.createdAt).toLocaleString()}</small></span></button>)}</div>
+
+        <aside className="bento-card col-4 profile-activity-card">
+          <div className="section-eyebrow">Profile activity</div>
+          <div className="expertise-meter"><div><span>Profile strength</span><strong>{profileScore}%</strong></div><div className="meter-track"><i style={{ width: `${profileScore}%` }}/></div><Link to="/edit-skills">Improve your profile</Link></div>
+          <div className="next-session"><p className="kpi-label">Next exchanges</p>{upcoming.length ? upcoming.map((booking, index) => <Link to="/bookings" className="session-row" key={booking._id}><span className={index === 0 ? 'status-dot dot-indigo' : 'status-dot dot-grey'}/><span><strong>{booking.skill}</strong><small>{new Date(booking.proposedTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</small></span></Link>) : <div className="bento-empty compact"><span>No sessions planned</span><Link to="/browse">Find an expert</Link></div>}</div>
+        </aside>
+
+        <section className="bento-card col-12">
+          <div className="section-eyebrow">Recent activity</div>
+          {notificationsLoading ? <div className="bento-loading">Loading your activity…</div> : <div className="activity-grid">{notifications.slice(0, 6).map((notification) => <button type="button" className="activity-item" key={notification._id} onClick={() => { if (!notification.read) dispatch(markNotificationRead(notification._id)); }}><span className={`status-dot ${notification.read ? 'dot-grey' : 'dot-indigo'}`}/><span><strong>{notification.message}</strong><small>{new Date(notification.createdAt).toLocaleDateString()}</small></span></button>)}</div>}
+          {!notificationsLoading && notifications.length === 0 && <div className="bento-empty compact"><strong>You’re all caught up</strong><span>New booking, message, and credit updates will appear here.</span></div>}
         </section>
       </div>
     </AppShell>
   );
 }
+
 export default Dashboard;

@@ -57,6 +57,19 @@ exports.getProfile = async (req, res) => {
 
 exports.getMe = exports.getProfile;
 
+// Return only fields that are appropriate for a community-facing profile.
+exports.getPublicProfile = async (req, res) => {
+  try {
+    const user = await findUserByAnyId(req.params.id);
+    if (!user || user.status === 'suspended') return res.status(404).json({ message: 'Member not found' });
+    const profile = user.toObject();
+    const { password, email, clerkId, googleId, tokenVersion, creditBalance, role, status, ...publicProfile } = profile;
+    return res.json(publicProfile);
+  } catch (err) {
+    return res.status(500).json({ message: 'Could not retrieve this member profile' });
+  }
+};
+
 // UPDATE the logged-in user's skills
 exports.updateSkills = async (req, res) => {
   try {

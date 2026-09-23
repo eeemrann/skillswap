@@ -2,18 +2,26 @@ import { Link } from 'react-router-dom';
 import { Brand } from '../components/AppShell';
 import Icon from '../components/Icon';
 import './Landing.css';
-import.meta.env.VITE_GOOGLE_CLIENT_ID
+
+const principles = [
+  ['01', 'Professional profile', 'Document the skills you have mastered and the expertise you are actively building.'],
+  ['02', 'Signal-based matching', 'Connect through expertise, availability, and distance instead of noisy social feeds.'],
+  ['03', 'Atomic time credits', 'Teach for one hour and earn one credit. Spend it learning from anyone in the network.']
+];
 
 function Landing() {
-  return (
-    <main className="landing-page">
-      <nav className="landing-nav"><Link className="landing-brand" to="/"><Brand /></Link><div className="landing-nav-links"><a href="#how-it-works">How it works</a><Link to="/login">Sign in</Link><Link className="landing-nav-cta" to="/register">Join SkillSwap <Icon name="arrow" size={15}/></Link></div></nav>
-      <section className="landing-hero">
-        <div className="landing-copy"><div className="landing-pill"><span /> Community-powered learning</div><h1>Learn anything.<br/><span>Teach what you love.</span></h1><p className="landing-description">A trusted place to exchange real skills with real people. No subscriptions, no awkward pricing&mdash;just time, curiosity, and community.</p><div className="landing-actions"><Link className="landing-primary" to="/register">Start learning free <Icon name="arrow" /></Link><a className="landing-text-link" href="#how-it-works">See how it works</a></div><div className="landing-proof"><div className="proof-avatars"><span>AM</span><span>JP</span><span>LS</span><span>+2k</span></div><p><strong>A community built on generosity</strong><br/>Share one hour. Unlock another.</p></div></div>
-        <div className="hero-visual" aria-label="Example skill exchange"><div className="visual-glow"/><div className="floating-chip chip-one">Photography <span>+1 hr</span></div><div className="floating-chip chip-two">Spanish <span>Booked</span></div><div className="exchange-scene"><div className="scene-head"><span>Upcoming exchange</span><span className="live-dot">Confirmed</span></div><div className="scene-person"><span className="scene-avatar">AM</span><div><strong>Spanish with Salman</strong><small>Today, 6:30 PM &middot; 60 minutes</small></div></div><div className="scene-divider"/><div className="scene-meta"><div><small>Your balance</small><strong>8.5 credits</strong></div><div className="scene-people"><span>JL</span><span>MR</span><span>+4</span></div></div><button type="button">View session <Icon name="arrow" size={15}/></button></div></div>
-      </section>
-      <section className="landing-values" id="how-it-works"><div className="value-heading"><p className="landing-eyebrow">Simple by design</p><h2>Your knowledge is already valuable.</h2></div>{[['01','Create your profile','Share the skills you know and the ones you are ready to discover.'],['02','Meet your match','Browse trusted community members and find the right person to learn from.'],['03','Exchange and grow','Teach for an hour, earn a credit, and spend it learning something new.']].map(([n,t,d])=><article key={n}><span>{n}</span><h3>{t}</h3><p>{d}</p></article>)}</section>
-    </main>
-  );
+  return <main className="landing-page-premium">
+    <nav className="landing-nav-new"><Link className="landing-brand" to="/" aria-label="SkillSwap home"><Brand/></Link><div className="nav-links-right"><a href="#methodology">Methodology</a><Link className="login-link" to="/login">Sign in</Link><Link className="landing-nav-cta" to="/register">Join community <Icon name="arrow" size={14}/></Link></div></nav>
+
+    <section className="hero-section-new"><div className="landing-grid-background"/><div className="hero-glow"/>
+      <div className="hero-content"><div className="hero-badge"><span/> Now open for public beta</div><h1>Learn anything.<br/><em>Teach what you love.</em></h1><p className="hero-subtitle">A high-signal skill exchange for curious professionals. No subscriptions, no content treadmill—just useful knowledge moving between real people.</p><div className="hero-actions-new"><Link className="hero-primary" to="/register">Start learning free <Icon name="arrow" size={17}/></Link><a className="hero-secondary" href="#methodology">Read the methodology</a></div><div className="hero-proof-new"><div className="avatar-stack-new"><span>AM</span><span>JP</span><span>LS</span><span>+2k</span></div><p><strong>Built for generous experts</strong><small>One hour shared unlocks one hour learned.</small></p></div></div>
+
+      <div className="hero-visual-container" aria-label="Example upcoming exchange"><div className="preview-orbit orbit-one">React <span>Expert</span></div><div className="preview-orbit orbit-two">1 credit <span>60 min</span></div><article className="glass-preview-card"><header><span className="landing-status"><i/> Upcoming exchange</span><Icon name="message" size={15}/></header><div className="session-expert"><span>HA</span><div><small>Advanced React patterns</small><strong>Hamza Bin Arif</strong></div></div><div className="session-time"><div><small>When</small><strong>Today, 6:00 PM</strong></div><div><small>Duration</small><strong>60 minutes</strong></div></div><footer><span>1.0 time credit</span><button type="button">View details <Icon name="arrow" size={13}/></button></footer></article></div>
+    </section>
+
+    <section className="landing-values-new" id="methodology"><header><p>Methodology</p><h2>A more useful way to grow.</h2><span>SkillSwap turns knowledge into a portable currency—simple enough for individuals, structured enough for professional communities.</span></header><div className="values-grid-new">{principles.map(([number, title, description]) => <article key={number}><span>{number}</span><div><h3>{title}</h3><p>{description}</p></div></article>)}</div></section>
+    <footer className="landing-footer-new"><Link className="landing-brand" to="/"><Brand/></Link><p>Knowledge moves when people do.</p><div><Link to="/login">Sign in</Link><Link to="/register">Join SkillSwap</Link></div></footer>
+  </main>;
 }
+
 export default Landing;

@@ -17,6 +17,7 @@ import Landing from './pages/Landing';
 import CreditHistory from './pages/CreditHistory';
 import Messages from './pages/Messages';
 import AdminDashboard from './pages/AdminDashboard';
+import UserProfile from './pages/UserProfile';
 import OnboardingModal from './components/OnboardingModal';
 
 function LoadingScreen() { return <div className="loading-screen">Loading workspace...</div>; }
@@ -87,6 +88,7 @@ function AppRoutes() {
     <Route path="/register/*" element={<PublicAuthRoute><Register /></PublicAuthRoute>} />
     <Route path="/dashboard" element={<ProtectedRoute isReady={isSynced}><Dashboard /></ProtectedRoute>} />
     <Route path="/browse" element={<ProtectedRoute isReady={isSynced}><Browse /></ProtectedRoute>} />
+    <Route path="/profile/:id" element={<ProtectedRoute isReady={isSynced}><UserProfile /></ProtectedRoute>} />
     <Route path="/bookings" element={<ProtectedRoute isReady={isSynced}><Bookings /></ProtectedRoute>} />
     <Route path="/messages" element={<ProtectedRoute isReady={isSynced}><Messages /></ProtectedRoute>} />
     <Route path="/edit-skills" element={<ProtectedRoute isReady={isSynced}><EditSkills /></ProtectedRoute>} />
