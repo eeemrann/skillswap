@@ -97,7 +97,7 @@ sequenceDiagram
     API-->>D: Ranked matches
 ```
 
-The match score is `skill overlap + 0.25 availability overlap + 0.25 location match`. When both locations have valid two-number coordinate arrays, the matcher uses the haversine formula and a 25 km limit. If either side lacks valid coordinates, it falls back to case-insensitive city equality. Coordinates are always GeoJSON `[longitude, latitude]`. Reasons are `Within 25km` or `Same location` respectively.
+The match score is `skill overlap + 0.25 availability overlap + 0.25 location match`. Browse and Matches share a session-only radius selector with exactly `25km`, `50km`, `100km`, `200km`, `400km`, and `Worldwide`. The state resets to `25km` on a fresh app load and is never stored in the database or browser storage. When both locations have valid two-number coordinate arrays, the matcher uses the haversine formula and the selected radius; `Worldwide` skips the distance cutoff. If either side lacks valid coordinates, it falls back to case-insensitive city equality. Coordinates are always GeoJSON `[longitude, latitude]`. Reasons are `Within {radius}km`, `Worldwide`, or `Same location` respectively.
 
 ### Booking, credits, notifications, and email
 
@@ -133,8 +133,8 @@ sequenceDiagram
 - Clerk email OTP and OAuth authentication.
 - First-login profile provisioning and skills onboarding.
 - Five starting time credits for new profiles.
-- Skill, availability, and 25 km coordinate-aware matching.
-- Browse discovery using MongoDB `$geoNear` with a safe active-user fallback.
+- Skill, availability, and user-adjustable coordinate-aware matching.
+- Browse discovery using MongoDB `$geoNear` with selectable 25/50/100/200/400 km radii and a Worldwide option.
 - Booking idempotency and overlap/conflict protection.
 - Atomic one-credit transfer when a booking is completed.
 - Booking-gated messaging, in-app notifications, and reviews.
@@ -278,8 +278,8 @@ The API is mounted under `/api`. Protected routes require a Clerk session token.
 | `PUT` | `/api/users/me/skills` | Update wanted/offered skills |
 | `PUT` | `/api/users/me/profile` | Update profile fields |
 | `PATCH` | `/api/users/me/location` | Save browser coordinates |
-| `GET` | `/api/users?lng=&lat=` | Browse active users, preferring 25 km GeoNear results |
-| `GET` | `/api/matches` | Ranked recommendations |
+| `GET` | `/api/users?lng=&lat=&radiusKm=` | Browse active users using the selected radius or Worldwide |
+| `GET` | `/api/matches?radiusKm=` | Ranked recommendations using the selected radius |
 
 ### Exchanges
 

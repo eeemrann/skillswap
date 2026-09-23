@@ -1,6 +1,14 @@
 const axios = require('axios');
 const User = require('../models/User');
 
+const ALLOWED_RADIUS_KM = [25, 50, 100, 200, 400];
+
+const parseRadiusKm = (value) => {
+  if (String(value || '').trim().toLowerCase() === 'worldwide') return 'worldwide';
+  const radiusKm = Number(value);
+  return ALLOWED_RADIUS_KM.includes(radiusKm) ? radiusKm : 25;
+};
+
 const normalizeSkills = (skills = []) => new Set(
   skills.filter(Boolean).map((skill) => String(skill).trim().toLowerCase())
 );
@@ -24,16 +32,19 @@ const haversineDistanceKm = (first, second) => {
   return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
-const locationMatch = (first = {}, second = {}) => {
+const locationMatch = (first = {}, second = {}, radiusKm = 25) => {
   if (validCoordinates(first.coordinates) && validCoordinates(second.coordinates)) {
-    return { matched: haversineDistanceKm(first.coordinates, second.coordinates) <= 25, source: 'coordinates' };
+    return {
+      matched: radiusKm === 'worldwide' || haversineDistanceKm(first.coordinates, second.coordinates) <= radiusKm,
+      source: 'coordinates'
+    };
   }
   const firstCity = String(first?.city || '').trim().toLowerCase();
   const secondCity = String(second?.city || '').trim().toLowerCase();
   return { matched: Boolean(firstCity && secondCity && firstCity === secondCity), source: 'city' };
 };
 
-const matchLocally = (me, candidates) => {
+const matchLocally = (me, candidates, radiusKm) => {
   const wanted = normalizeSkills(me.skillsWanted);
 
   return candidates.map((candidate) => {
@@ -41,7 +52,7 @@ const matchLocally = (me, candidates) => {
     if (!overlap.length) return null;
 
     const availabilityOverlap = hasAvailabilityOverlap(me.availability, candidate.availability);
-    const locationResult = locationMatch(me.location, candidate.location);
+    const locationResult = locationMatch(me.location, candidate.location, radiusKm);
     const locationOverlap = locationResult.matched;
     return {
       id: candidate.id,
@@ -51,7 +62,9 @@ const matchLocally = (me, candidates) => {
       matchReasons: [
         ...overlap.map((skill) => `Offers ${skill}`),
         ...(availabilityOverlap ? ['Availability overlaps'] : []),
-        ...(locationOverlap ? [locationResult.source === 'coordinates' ? 'Within 25km' : 'Same location'] : [])
+        ...(locationOverlap ? [locationResult.source === 'coordinates'
+          ? (radiusKm === 'worldwide' ? 'Worldwide' : `Within ${radiusKm}km`)
+          : 'Same location'] : [])
       ]
     };
   }).filter(Boolean).sort((first, second) => second.score - first.score);
@@ -59,6 +72,7 @@ const matchLocally = (me, candidates) => {
 
 exports.getMatches = async (req, res) => {
   try {
+    const radiusKm = parseRadiusKm(req.query?.radiusKm);
     const me = await User.findById(req.userId);
     if (!me) return res.status(404).json({ message: 'User not found' });
     const others = await User.find({ _id: { $ne: req.userId }, status: { $ne: 'suspended' } })
@@ -83,6 +97,7 @@ exports.getMatches = async (req, res) => {
         mySkillsWanted: me.skillsWanted,
         myLocation: me.location,
         myAvailability: me.availability,
+        radiusKm,
         candidates
       }, { timeout: matchingServiceTimeoutMs });
 
@@ -90,7 +105,7 @@ exports.getMatches = async (req, res) => {
     } catch {
       // Keep recommendations useful when the optional Python service is asleep
       // or not deployed alongside the API.
-      return res.json(matchLocally(me, candidates));
+      return res.json(matchLocally(me, candidates, radiusKm));
     }
   } catch (err) {
     console.error('Recommendations failed:', err.message);

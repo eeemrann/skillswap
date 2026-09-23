@@ -1,6 +1,14 @@
 const mongoose = require('mongoose');
 const User = require('../models/User');
 
+const ALLOWED_RADIUS_KM = [25, 50, 100, 200, 400];
+
+const parseRadiusKm = (value) => {
+  if (String(value || '').trim().toLowerCase() === 'worldwide') return 'worldwide';
+  const radiusKm = Number(value);
+  return ALLOWED_RADIUS_KM.includes(radiusKm) ? radiusKm : 25;
+};
+
 const cleanSkills = (value) => {
   if (!Array.isArray(value)) return [];
   const unique = new Map();
@@ -107,11 +115,12 @@ exports.updateProfile = async (req, res) => {
 exports.getAllUsers = async (req, res) => {
   const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
   const page = Math.max(Number(req.query.page) || 1, 1);
+  const radiusKm = parseRadiusKm(req.query.radiusKm);
   const requesterFilter = mongoose.Types.ObjectId.isValid(req.userId)
     ? { _id: { $ne: new mongoose.Types.ObjectId(req.userId) } }
     : {};
   const fallback = () => User.find({ ...requesterFilter, status: { $ne: 'suspended' } })
-    .select('-password').skip((page - 1) * limit).limit(limit).lean();
+    .select('-password').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean();
   try {
     const lng = Number(req.query.lng);
     const lat = Number(req.query.lat);
@@ -119,8 +128,9 @@ exports.getAllUsers = async (req, res) => {
       && Number.isFinite(lng) && Number.isFinite(lat)
       && lng >= -180 && lng <= 180 && lat >= -90 && lat <= 90;
     if (!hasValidQueryCoordinates) return res.set('X-Location-Fallback', 'true').status(200).json(await fallback());
+    if (radiusKm === 'worldwide') return res.status(200).json(await fallback());
     console.log('Querying near:', [lng, lat], 'Requester ID:', req.userId);
-    const maxDistanceMeters = 25000;
+    const maxDistanceMeters = radiusKm * 1000;
     const users = await User.aggregate([
       { $geoNear: {
         near: { type: 'Point', coordinates: [lng, lat] },
@@ -158,8 +168,8 @@ exports.getAllUsers = async (req, res) => {
     ]);
     console.log('Found nearby users count:', users.length);
     if (users.length === 0) {
-      console.log('GeoNear returned 0. Falling back to all active users.');
-      return res.set('X-Location-Fallback', 'true').status(200).json(await fallback());
+      console.log(`GeoNear returned 0 within ${radiusKm}km.`);
+      return res.status(200).json(users);
     }
     return res.status(200).json(users);
   } catch (err) {

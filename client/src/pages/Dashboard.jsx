@@ -7,6 +7,7 @@ import AppShell from '../components/AppShell';
 import Icon from '../components/Icon';
 import { updateUser } from '../redux/authSlice';
 import { fetchNotifications, fetchUnreadCounts, markNotificationRead } from '../redux/notificationSlice';
+import { SEARCH_RADIUS_OPTIONS, setRadiusKm } from '../redux/searchRadiusSlice';
 
 const initials = (name = '') => name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase();
 
@@ -15,6 +16,7 @@ function Dashboard() {
   const authToken = useSelector((state) => state.auth.token);
   const { isLoaded, isSignedIn } = useAuth();
   const { items: notifications, loading: notificationsLoading } = useSelector((state) => state.notifications);
+  const radiusKm = useSelector((state) => state.searchRadius.radiusKm);
   const dispatch = useDispatch();
   const [matches, setMatches] = useState([]);
   const [bookings, setBookings] = useState([]);
@@ -32,7 +34,7 @@ function Dashboard() {
 
     const [userResult, matchResult, bookingResult] = await Promise.allSettled([
       api.get('/users/me'),
-      api.get('/matches'),
+      api.get(`/matches?radiusKm=${encodeURIComponent(radiusKm)}`),
       api.get('/bookings')
     ]);
 
@@ -41,7 +43,7 @@ function Dashboard() {
     if (matchResult.status === 'fulfilled') setMatches(matchResult.value.data);
     if (bookingResult.status === 'fulfilled') setBookings(bookingResult.value.data);
     if (isInitial) setLoading(false);
-  }, [dispatch, token]);
+  }, [dispatch, radiusKm, token]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return undefined;
@@ -74,8 +76,9 @@ function Dashboard() {
         </div>
         <div className="content-grid two-column">
           <section className="surface surface-pad">
-            <div className="section-heading"><div><p className="section-kicker">Recommended for you</p><h2>People worth meeting</h2></div><Link to="/browse">View all <Icon name="arrow" size={14}/></Link></div>
+            <div className="section-heading"><div><p className="section-kicker">Recommended for you</p><h2>People worth meeting</h2><small className="match-radius-note">Location scoring: {radiusKm === 'worldwide' ? 'Worldwide' : `Within ${radiusKm}km`}</small></div><div className="recommendation-actions"><label className="radius-control"><span>Radius</span><select value={radiusKm} onChange={(event) => dispatch(setRadiusKm(event.target.value === 'worldwide' ? 'worldwide' : Number(event.target.value)))} aria-label="Match search radius">{SEARCH_RADIUS_OPTIONS.map((option) => <option value={option} key={option}>{option === 'worldwide' ? 'Worldwide' : `${option}km`}</option>)}</select></label><Link to="/browse">View all <Icon name="arrow" size={14}/></Link></div></div>
             {loading && <div className="recommendation-loading" aria-label="Loading recommendations">{[1, 2, 3].map((item) => <div className="recommendation-skeleton" key={item}><span /><div><i /><i /></div></div>)}</div>}
+            {!loading && matches.length > 0 && <div className="match-reasons-summary">{matches.slice(0, 4).map((match) => <span key={match.id || match._id}><strong>{match.name}:</strong> {match.matchReasons?.join(' · ') || 'Skill overlap'}</span>)}</div>}
             {!loading && matches.length === 0 && <div className="recommendation-empty"><span className="recommendation-spark" aria-hidden="true">✨</span><h3>No recommendations yet</h3><p>Complete your profile by adding:</p><ul><li>Skills you want to learn</li><li>Skills you can teach</li></ul><p>We&apos;ll find skill exchange partners for you.</p><Link className="primary-button" to="/edit-skills">Complete Profile <Icon name="arrow" size={15}/></Link></div>}
             {!loading && <div className="match-list">{matches.slice(0, 4).map((match) => <article className="match-card" key={match.id || match._id}><div className="match-person"><span className="avatar avatar-small">{initials(match.name)}</span><div><h3>{match.name}</h3><p>{match.matchedSkills?.join(' · ') || 'A promising skill overlap'}</p></div></div><span className="match-score">{match.score || 'New'} match</span></article>)}</div>}
           </section>

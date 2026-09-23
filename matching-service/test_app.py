@@ -49,6 +49,30 @@ class MatchingServiceTest(unittest.TestCase):
         })
         self.assertEqual(response.get_json()[0]['matchReasons'][-1], 'Same location')
 
+    def test_radius_50_matches_candidate_that_radius_25_rejects(self):
+        payload = {
+            'mySkillsWanted': ['Guitar'],
+            'myLocation': {'coordinates': [0, 0]},
+            'candidates': [{'id': 'medium-distance', 'name': 'Medium distance', 'skillsOffered': ['guitar'],
+                            'location': {'coordinates': [0.4, 0]}}]
+        }
+        radius_25 = app.test_client().post('/match', json={**payload, 'radiusKm': 25})
+        radius_50 = app.test_client().post('/match', json={**payload, 'radiusKm': 50})
+        self.assertEqual(radius_25.get_json()[0]['score'], 1)
+        self.assertEqual(radius_50.get_json()[0]['score'], 1.25)
+        self.assertIn('Within 50km', radius_50.get_json()[0]['matchReasons'])
+
+    def test_worldwide_matches_coordinates_across_countries(self):
+        response = app.test_client().post('/match', json={
+            'mySkillsWanted': ['Guitar'],
+            'myLocation': {'city': 'New York', 'coordinates': [-73.9857, 40.7484]},
+            'radiusKm': 'worldwide',
+            'candidates': [{'id': 'australia', 'name': 'Australia', 'skillsOffered': ['guitar'],
+                            'location': {'city': 'Sydney', 'coordinates': [151.2093, -33.8688]}}]
+        })
+        self.assertEqual(response.get_json()[0]['score'], 1.25)
+        self.assertIn('Worldwide', response.get_json()[0]['matchReasons'])
+
 
 if __name__ == '__main__':
     unittest.main()
