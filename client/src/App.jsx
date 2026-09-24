@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { ClerkProvider, useAuth } from '@clerk/clerk-react';
+import { AuthenticateWithRedirectCallback, ClerkProvider, useAuth } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { setClerkTokenGetter } from './api/axios';
@@ -94,6 +94,7 @@ function AppRoutes() {
     <Route path="/" element={<Landing />} />
     <Route path="/login/*" element={<PublicAuthRoute><Login /></PublicAuthRoute>} />
     <Route path="/register/*" element={<PublicAuthRoute><Register /></PublicAuthRoute>} />
+    <Route path="/sso-callback" element={<AuthenticateWithRedirectCallback />} />
     <Route path="/dashboard" element={<ProtectedRoute isReady={isSynced}><Dashboard /></ProtectedRoute>} />
     <Route path="/browse" element={<ProtectedRoute isReady={isSynced}><Browse /></ProtectedRoute>} />
     <Route path="/profile/:id" element={<ProtectedRoute isReady={isSynced}><UserProfile /></ProtectedRoute>} />

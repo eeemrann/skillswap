@@ -13,7 +13,9 @@ function AuthLayout({ children, mode }) {
           <Link to="/" className="auth-back-home" aria-label="SkillSwap home"><Brand /></Link>
           <div className="auth-statement">
             <p className="eyebrow">Expertise Vault</p>
-            <h2>{isLogin ? 'Welcome back to the exchange.' : 'Join the next generation.'}</h2>
+            <h2 className="auth-display-title">
+              {isLogin ? <><span>Welcome back</span><span>to the expert</span><span>exchange.</span></> : <><span>Build your</span><span>expert identity</span><span>with us.</span></>}
+            </h2>
             <p className="auth-description">Access a focused network of professionals exchanging practical, niche expertise.</p>
             <div className="auth-proof-grid" aria-label="Platform benefits">
               <div><strong>1:1</strong><span>Fair time exchange</span></div>
