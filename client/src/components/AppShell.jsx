@@ -97,10 +97,13 @@ function AppShell({ children, eyebrow, title, description, action }) {
             return <NavLink key={item.to} to={item.to} className="nav-link-glass nav-link-foundry" onClick={() => setMenuOpen(false)}><Icon name={item.icon} size={18}/><span>{item.label}</span>{count > 0 && <span className="notification-badge" aria-label={`${count} unread notifications`}>{count > 99 ? '99+' : count}</span>}</NavLink>;
           })}
         </nav>
+        <div className="sidebar-theme-control">
+          <span><Icon name={theme === 'dark' ? 'moon' : 'sun'} size={15}/><span>Appearance</span></span>
+          <button className="theme-switch" type="button" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} aria-pressed={theme === 'light'}><span /></button>
+        </div>
         <div className="glass-user-card foundry-user-card">
           <UserButton appearance={{ elements: { avatarBox: 'avatar avatar-small' } }} afterSignOutUrl="/" />
           <div className="glass-user-copy"><strong>{user?.name || clerkUser?.fullName || 'SkillSwap member'}</strong><small>{user?.creditBalance ?? 0} Credits</small></div>
-          <button className="icon-button theme-toggle" type="button" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}><Icon name={theme === 'dark' ? 'sun' : 'moon'} size={17}/></button>
           <button className="icon-button" type="button" onClick={handleLogout} aria-label="Sign out" title="Sign out"><Icon name="logout" size={17}/></button>
         </div>
       </aside>
