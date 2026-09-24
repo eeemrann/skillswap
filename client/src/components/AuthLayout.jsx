@@ -30,10 +30,7 @@ function AuthLayout({ children, mode }) {
             <h1>{isLogin ? 'Welcome back' : 'Create your account'}</h1>
             <p>{isLogin ? 'Sign in to continue to your workspace.' : 'Join the expert exchange in a few steps.'}</p>
           </header>
-          <div className="auth-clerk-panel">
-            <div className="auth-provider-label"><span className="secure-dot" />Identity gateway <strong>Clerk</strong></div>
-            <div className="clerk-wrapper-foundry">{children}</div>
-          </div>
+          <div className="auth-clerk-panel"><div className="clerk-wrapper-foundry">{children}</div></div>
           <footer className="auth-form-footer"><p>{isLogin ? 'New here?' : 'Already a member?'}{' '}<Link to={isLogin ? '/register' : '/login'}>{isLogin ? 'Create account' : 'Log in'}</Link></p></footer>
         </div>
       </section>
