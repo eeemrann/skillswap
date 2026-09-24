@@ -62,8 +62,8 @@ export default function Login() {
         <div className="auth-form-divider"><span>or continue with email</span></div>
         <form className="custom-clerk-form" onSubmit={handleSubmit}>
           {error && <div className="auth-inline-error" role="alert">{error}</div>}
-          <div className="auth-field"><label htmlFor="login-email">Email address</label><input id="login-email" type="email" autoComplete="email" value={emailAddress} onChange={(event) => setEmailAddress(event.target.value)} placeholder="Enter your email address" required /></div>
-          <div className="auth-field"><div className="auth-field-heading"><label htmlFor="login-password">Password</label><span>Secure credentials</span></div><div className="password-field-wrap"><input id="login-password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" required /><button type="button" onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? 'Hide' : 'Show'}</button></div></div>
+          <div className="auth-field"><label htmlFor="login-email">Email address</label><input id="login-email" type="email" autoComplete="email" value={emailAddress} onChange={(event) => setEmailAddress(event.target.value)} placeholder="name@company.com" required /></div>
+          <div className="auth-field"><div className="auth-field-heading"><label htmlFor="login-password">Password</label></div><div className="password-field-wrap"><input id="login-password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" required /><button type="button" onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? 'Hide' : 'Show'}</button></div></div>
           <button className="auth-submit-button" type="submit" disabled={!isLoaded || submitting}>{submitting ? 'Signing in...' : 'Sign in securely'}</button>
         </form>
       </div>

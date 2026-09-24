@@ -126,3 +126,20 @@ input::placeholder, textarea::placeholder {
 .auth-form-side{overflow-y:auto;padding-block:clamp(24px,4vh,48px)}
 @media(max-height:760px) and (min-width:1001px){.auth-visual-side{padding:28px 36px}.auth-statement .auth-display-title{font-size:clamp(42px,5vw,66px)}.auth-proof-grid{margin-top:22px}.auth-form-side{justify-content:flex-start}.form-header-premium{margin-bottom:14px}.auth-form-footer{margin-top:14px}.custom-auth-stack{gap:13px;padding:20px 24px}.custom-clerk-form{gap:13px}}
 @media(max-width:1000px){.foundry-auth-page{display:block}.auth-form-side{width:100%;min-height:100dvh}.form-container-inner{max-width:440px}}
+
+/* Unified Obsidian auth surface. These rules intentionally outrank Clerk defaults. */
+html:has(.foundry-auth-page),body:has(.foundry-auth-page),#root:has(.foundry-auth-page){min-height:100%;background:#000!important}
+.foundry-auth-page{width:100%;background:#000;color:#fff}
+.auth-form-side{background:#08090d!important}
+.auth-clerk-panel{width:100%;overflow:hidden;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:#0a0a0a;box-shadow:0 24px 64px -42px #000}
+.auth-clerk-panel .cl-rootBox,.auth-clerk-panel .cl-cardBox{width:100%!important;max-width:100%!important}
+.auth-clerk-panel .cl-card{width:100%!important;max-width:100%!important;border:0!important;border-radius:0!important;background:#0a0a0a!important;box-shadow:none!important}
+.auth-clerk-panel .cl-socialButtonsBlockButton,.google-auth-button{display:flex!important;width:100%!important;min-height:44px!important;align-items:center!important;justify-content:center!important;gap:12px!important;border:1px solid rgba(255,255,255,.15)!important;border-radius:8px!important;background:#000!important;color:#fff!important;font-size:14px!important;font-weight:600!important}
+.auth-clerk-panel .cl-socialButtonsBlockButton:hover,.google-auth-button:hover:not(:disabled){border-color:rgba(255,255,255,.3)!important;background:#111!important;color:#fff!important}
+.auth-clerk-panel .cl-socialButtonsBlockButtonText{color:#fff!important}
+.auth-field input::placeholder,.auth-clerk-panel .cl-formFieldInput::placeholder{color:#8b8b95!important;opacity:1!important}
+.auth-clerk-panel .cl-formFieldInput{border-color:rgba(255,255,255,.15)!important;background:#000!important;color:#fff!important}
+.auth-clerk-panel .cl-otpCodeFieldInput{border:1px solid rgba(255,255,255,.3)!important;background:#000!important;color:#fff!important}
+.auth-clerk-panel .cl-otpCodeFieldInput:focus{border-color:#6366f1!important;box-shadow:0 0 0 1px #6366f1!important}
+.auth-form-divider{margin:0}
+.form-container-inner{width:100%;max-width:400px}

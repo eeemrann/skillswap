@@ -5,7 +5,7 @@ function AuthLayout({ children, mode }) {
   const isLogin = mode === 'login';
 
   return (
-    <main className="foundry-auth-page auth-viewport-locked">
+    <main className="foundry-auth-page">
       <section className="auth-visual-side">
         <div className="auth-grid-overlay" />
         <div className="auth-atmosphere-glow" />
@@ -15,10 +15,6 @@ function AuthLayout({ children, mode }) {
             <p className="eyebrow">Expertise Vault</p>
             <h2>{isLogin ? 'Welcome back to the exchange.' : 'Join the next generation.'}</h2>
             <p className="auth-description">Access a focused network of professionals exchanging practical, niche expertise.</p>
-            <div className="auth-proof-grid" aria-label="Platform benefits">
-              <div><strong>1:1</strong><span>Fair time exchange</span></div>
-              <div><strong>DIRECT</strong><span>Expert to expert</span></div>
-            </div>
           </div>
           <div className="auth-footer-badge"><span className="secure-dot" />Encrypted Session Active</div>
         </div>
@@ -27,8 +23,8 @@ function AuthLayout({ children, mode }) {
       <section className="auth-form-side">
         <div className="form-container-inner fade-in">
           <header className="form-header-premium">
-            <h1>{isLogin ? 'Welcome back' : 'Create your account'}</h1>
-            <p>{isLogin ? 'Sign in to continue to your workspace.' : 'Join the expert exchange in a few steps.'}</p>
+            <h1>{isLogin ? 'Sign In' : 'Create Account'}</h1>
+            <p>{isLogin ? 'Provide your credentials to enter.' : 'Join the expert community.'}</p>
           </header>
           <div className="auth-clerk-panel"><div className="clerk-wrapper-foundry">{children}</div></div>
           <footer className="auth-form-footer"><p>{isLogin ? 'New here?' : 'Already a member?'}{' '}<Link to={isLogin ? '/register' : '/login'}>{isLogin ? 'Create account' : 'Log in'}</Link></p></footer>
