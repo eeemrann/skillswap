@@ -119,3 +119,10 @@ input::placeholder, textarea::placeholder {
 @media(max-width:1200px) and (min-width:1001px){.auth-statement .auth-display-title{font-size:clamp(44px,5.2vw,64px)}.auth-display-title span{white-space:normal}}
 @media(max-width:480px){.custom-clerk-form{padding:22px 18px}.auth-form-side{height:auto;min-height:100dvh;padding:28px 12px}.form-container-inner{max-width:430px}}
 .custom-auth-stack{display:grid;gap:18px;padding:28px}.custom-auth-stack .custom-clerk-form{padding:0}@media(max-width:480px){.custom-auth-stack{padding:22px 18px}.custom-auth-stack .custom-clerk-form{padding:0}}
+
+/* Auth pages fit both short laptops and tall mobile screens without clipping. */
+.foundry-auth-page{min-height:100dvh;height:auto;overflow:visible}
+.auth-visual-side,.auth-form-side{min-height:100dvh;height:auto}
+.auth-form-side{overflow-y:auto;padding-block:clamp(24px,4vh,48px)}
+@media(max-height:760px) and (min-width:1001px){.auth-visual-side{padding:28px 36px}.auth-statement .auth-display-title{font-size:clamp(42px,5vw,66px)}.auth-proof-grid{margin-top:22px}.auth-form-side{justify-content:flex-start}.form-header-premium{margin-bottom:14px}.auth-form-footer{margin-top:14px}.custom-auth-stack{gap:13px;padding:20px 24px}.custom-clerk-form{gap:13px}}
+@media(max-width:1000px){.foundry-auth-page{display:block}.auth-form-side{width:100%;min-height:100dvh}.form-container-inner{max-width:440px}}

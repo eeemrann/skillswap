@@ -1,26 +1,27 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
-import { ClerkProvider, useAuth } from '@clerk/clerk-react';
-import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { AuthenticateWithRedirectCallback, ClerkProvider, useAuth } from '@clerk/clerk-react';
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import { setClerkTokenGetter } from './api/axios';
 import api from './api/axios';
-import { updateUser, logout } from './redux/authSlice';
+import { logout, updateUser } from './redux/authSlice';
 import { fetchUnreadCounts } from './redux/notificationSlice';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import Browse from './pages/Browse';
-import EditSkills from './pages/EditSkills';
-import Bookings from './pages/Bookings';
-import Landing from './pages/Landing';
-import CreditHistory from './pages/CreditHistory';
-import Messages from './pages/Messages';
-import AdminDashboard from './pages/AdminDashboard';
-import UserProfile from './pages/UserProfile';
 import OnboardingModal from './components/OnboardingModal';
+import AdminDashboard from './pages/AdminDashboard';
+import Bookings from './pages/Bookings';
+import Browse from './pages/Browse';
+import CreditHistory from './pages/CreditHistory';
+import Dashboard from './pages/Dashboard';
+import EditSkills from './pages/EditSkills';
+import Landing from './pages/Landing';
+import Login from './pages/Login';
+import Messages from './pages/Messages';
+import Register from './pages/Register';
+import UserProfile from './pages/UserProfile';
 
-function LoadingScreen() { return <div className="loading-screen" role="status"><span className="loading-spinner" aria-hidden="true" />Loading workspace…</div>; }
+function LoadingScreen() {
+  return <div className="loading-screen" role="status"><span className="loading-spinner" aria-hidden="true" />Loading workspace…</div>;
+}
 
 function SyncError({ message, onRetry }) {
   return <main className="workspace-error"><div><span>Connection interrupted</span><h1>We couldn’t open your workspace.</h1><p>{message}</p><button className="primary-button" type="button" onClick={onRetry}>Try again</button></div></main>;
@@ -28,15 +29,7 @@ function SyncError({ message, onRetry }) {
 
 export function ClerkRouterProvider({ children }) {
   const navigate = useNavigate();
-  return (
-    <ClerkProvider
-      publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY}
-      routerPush={(to) => navigate(to)}
-      routerReplace={(to) => navigate(to, { replace: true })}
-    >
-      {children}
-    </ClerkProvider>
-  );
+  return <ClerkProvider publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY} routerPush={(to) => navigate(to)} routerReplace={(to) => navigate(to, { replace: true })}>{children}</ClerkProvider>;
 }
 
 function ProtectedRoute({ children, isReady }) {
@@ -47,8 +40,6 @@ function ProtectedRoute({ children, isReady }) {
 
 function PublicAuthRoute({ children }) {
   const { isLoaded, isSignedIn } = useAuth();
-  // Keep the Clerk flow mounted while auth state is loading so transient
-  // state updates do not cancel an in-progress verification step.
   if (!isLoaded) return children;
   return isSignedIn ? <Navigate replace to="/dashboard" /> : children;
 }
@@ -69,15 +60,16 @@ function AppRoutes() {
       queueMicrotask(() => { setSyncError(''); setIsSynced(true); });
       return undefined;
     }
+
     let active = true;
     queueMicrotask(() => { setSyncError(''); setIsSynced(false); });
     const initializeSession = async () => {
       try {
         const token = await getToken();
         if (!token) throw new Error('Clerk session token was unavailable');
-        const res = await api.get('/users/me');
+        const response = await api.get('/users/me');
         if (!active) return;
-        dispatch(updateUser(res.data));
+        dispatch(updateUser(response.data));
         dispatch(fetchUnreadCounts());
         setIsSynced(true);
       } catch (error) {
@@ -94,6 +86,7 @@ function AppRoutes() {
     <Route path="/" element={<Landing />} />
     <Route path="/login/*" element={<PublicAuthRoute><Login /></PublicAuthRoute>} />
     <Route path="/register/*" element={<PublicAuthRoute><Register /></PublicAuthRoute>} />
+    <Route path="/sso-callback" element={<AuthenticateWithRedirectCallback signInFallbackRedirectUrl="/dashboard" signUpFallbackRedirectUrl="/dashboard" />} />
     <Route path="/dashboard" element={<ProtectedRoute isReady={isSynced}><Dashboard /></ProtectedRoute>} />
     <Route path="/browse" element={<ProtectedRoute isReady={isSynced}><Browse /></ProtectedRoute>} />
     <Route path="/profile/:id" element={<ProtectedRoute isReady={isSynced}><UserProfile /></ProtectedRoute>} />
