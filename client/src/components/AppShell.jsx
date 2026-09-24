@@ -37,6 +37,7 @@ function AppShell({ children, eyebrow, title, description, action }) {
   const { user: clerkUser } = useUser();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [theme, setTheme] = useState(() => document.documentElement.dataset.theme || 'dark');
   const navLinks = user?.role === 'admin' ? [...links, { to: '/admin', label: 'Admin', icon: 'settings' }] : links;
 
   useEffect(() => {
@@ -76,10 +77,17 @@ function AppShell({ children, eyebrow, title, description, action }) {
     await signOut();
     navigate('/');
   };
+  const toggleTheme = () => {
+    const nextTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(nextTheme);
+    document.documentElement.dataset.theme = nextTheme;
+    document.documentElement.style.colorScheme = nextTheme;
+    localStorage.setItem('skillswap-theme', nextTheme);
+  };
   const badgeFor = (path) => path === '/dashboard' ? notificationCounts.all : path === '/bookings' ? notificationCounts.booking : path === '/messages' ? notificationCounts.message : 0;
 
   return (
-    <div className="app-frame glass-workspace foundry-workspace">
+    <div className={`app-frame glass-workspace foundry-workspace theme-${theme}`}>
       <aside className={`sidebar sidebar-premium sidebar-foundry ${menuOpen ? 'open' : ''}`}>
         <div className="glass-sidebar-brand foundry-sidebar-brand"><Link to="/dashboard" aria-label="SkillSwap workspace"><Brand /></Link></div>
         <div className="sidebar-label">Workspace</div>
@@ -92,13 +100,14 @@ function AppShell({ children, eyebrow, title, description, action }) {
         <div className="glass-user-card foundry-user-card">
           <UserButton appearance={{ elements: { avatarBox: 'avatar avatar-small' } }} afterSignOutUrl="/" />
           <div className="glass-user-copy"><strong>{user?.name || clerkUser?.fullName || 'SkillSwap member'}</strong><small>{user?.creditBalance ?? 0} Credits</small></div>
+          <button className="icon-button theme-toggle" type="button" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}><Icon name={theme === 'dark' ? 'sun' : 'moon'} size={17}/></button>
           <button className="icon-button" type="button" onClick={handleLogout} aria-label="Sign out" title="Sign out"><Icon name="logout" size={17}/></button>
         </div>
       </aside>
 
       {menuOpen && <button className="sidebar-scrim" type="button" onClick={() => setMenuOpen(false)} aria-label="Close navigation" />}
       <main className="app-main glass-main foundry-main">
-        <header className="mobile-header"><button className="icon-button" type="button" onClick={() => setMenuOpen(true)} aria-label="Open menu"><Icon name="menu" /></button><Link className="app-brand" to="/dashboard"><Brand /></Link><span className="avatar avatar-small">{initials(user?.name)}</span></header>
+        <header className="mobile-header"><button className="icon-button" type="button" onClick={() => setMenuOpen(true)} aria-label="Open menu"><Icon name="menu" /></button><Link className="app-brand" to="/dashboard"><Brand /></Link><div className="mobile-header-actions"><button className="icon-button theme-toggle" type="button" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}><Icon name={theme === 'dark' ? 'sun' : 'moon'} size={17}/></button><span className="avatar avatar-small">{initials(user?.name)}</span></div></header>
         <div className="page-wrap glass-page-wrap foundry-page-wrap page-enter">
           <header className="glass-page-heading foundry-page-heading"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1>{description && <p>{description}</p>}</div>{action && <div className="page-heading-action">{action}</div>}</header>
           {children}
