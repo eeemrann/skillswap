@@ -113,3 +113,91 @@ input::placeholder, textarea::placeholder {
   .foundry-auth-page { grid-template-columns: 1fr; }
   .auth-visual-side { display: none; }
 }
+
+/* 1. FIX GOOGLE BUTTON TO MATCH REGISTER PAGE */
+.google-auth-button {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 12px !important;
+  width: 100% !important;
+  height: 44px !important;
+  background-color: #000000 !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 8px !important;
+  color: #ffffff !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  margin-bottom: 4px !important;
+}
+
+.google-auth-button:hover:not(:disabled) {
+  background-color: #111111 !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* 2. FIX PLACEHOLDER VISIBILITY */
+.auth-field input::placeholder {
+  color: #71717a !important; /* Zinc-500: clearly visible grey */
+  opacity: 1 !important;
+}
+
+/* 3. FIX DIVIDER (OR CONTINUE WITH EMAIL) */
+.auth-form-divider {
+  display: flex;
+  align-items: center;
+  margin: 20px 0;
+  color: #52525b;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.auth-form-divider::before,
+.auth-form-divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.auth-form-divider span {
+  padding: 0 12px;
+}
+
+/* 4. FIX FORM INPUTS */
+.auth-field input {
+  background-color: #000 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 8px !important;
+  color: #fff !important;
+  height: 44px !important;
+  padding: 0 14px !important;
+  width: 100% !important;
+  transition: border-color 0.2s ease !important;
+}
+
+.auth-field input:focus {
+  border-color: #6366f1 !important;
+  outline: none !important;
+}
+
+/* 5. SUBMIT BUTTON */
+.auth-submit-button {
+  width: 100%;
+  height: 44px;
+  background-color: #6366f1;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 14px;
+  margin-top: 10px;
+  box-shadow: 0 10px 20px -10px rgba(99, 102, 241, 0.5);
+}
+
+.auth-submit-button:hover {
+  background-color: #4f46e5;
+}
