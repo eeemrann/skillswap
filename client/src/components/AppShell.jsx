@@ -87,7 +87,7 @@ function AppShell({ children, eyebrow, title, description, action }) {
   const badgeFor = (path) => path === '/dashboard' ? notificationCounts.all : path === '/bookings' ? notificationCounts.booking : path === '/messages' ? notificationCounts.message : 0;
 
   return (
-    <div className={`app-frame glass-workspace foundry-workspace theme-${theme}`}>
+    <div className={`app-frame glass-workspace theme-${theme}`}>
       <aside className={`sidebar sidebar-premium sidebar-foundry ${menuOpen ? 'open' : ''}`}>
         <div className="glass-sidebar-brand foundry-sidebar-brand"><Link to="/dashboard" aria-label="SkillSwap workspace"><Brand /></Link></div>
         <div className="sidebar-label">Workspace</div>
