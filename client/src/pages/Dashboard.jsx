@@ -4,6 +4,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { Link } from 'react-router-dom';
 import api from '../api/axios';
 import AppShell from '../components/AppShell';
+import Icon from '../components/Icon';
 import { updateUser } from '../redux/authSlice';
 import { fetchNotifications, fetchUnreadCounts } from '../redux/notificationSlice';
 
@@ -52,25 +53,23 @@ function Dashboard() {
   const matchPercent = (score) => Math.min(100, Math.round((Number(score || 0) / Math.max(user?.skillsWanted?.length || 1, 1)) * 100));
 
   return (
-    <AppShell eyebrow="Workspace Overview" title={`Welcome, ${user?.name?.split(' ')[0] || 'Expert'}.`} description="Your expertise exchange, distilled into one focused view.">
-      <div className="glass-bento-container">
-        <article className="glass-card col-4"><span className="glass-kicker">Wallet</span><div className="kpi-value-glass">{user?.creditBalance ?? 0}</div><p className="glass-muted">Available hours for learning</p></article>
-        <article className="glass-card col-4"><span className="glass-kicker">Recommendations</span><div className="kpi-value-glass">{loading ? '—' : matches.length}</div><p className="glass-muted">Experts found for your skills</p></article>
-        <article className="glass-card col-4"><span className="glass-kicker">History</span><div className="kpi-value-glass">{loading ? '—' : completed}</div><p className="glass-muted">Completed exchanges</p></article>
+    <AppShell eyebrow="SYSTEM_STATUS: OPERATIONAL" title="Overview" description={`Command interface for ${user?.name?.split(' ')[0] || 'Expert'}.`}>
+      <div className="foundry-grid">
+        <article className="foundry-card col-4"><span className="mono-label">Credit Reserve</span><div className="mono-value">{user?.creditBalance ?? 0}<span>.0</span></div><p className="foundry-muted">Verified time credits available</p></article>
+        <article className="foundry-card col-4"><span className="mono-label">Match Signals</span><div className="mono-value">{loading ? '—' : matches.length}</div><p className="foundry-muted">Engine-detected expertise overlap</p></article>
+        <article className="foundry-card col-4 foundry-status-card"><span className="mono-label">Exchange Output</span><div className="mono-value">{loading ? '—' : completed}</div><div className="network-state"><i/><span>Network Online</span></div></article>
 
-        <section className="glass-card col-8">
-          <div className="glass-card-heading"><h2>People worth meeting</h2><Link to="/browse">View All →</Link></div>
-          {loading ? <div className="glass-empty">Finding your strongest skill overlaps…</div> : <div className="glass-expert-list">
-            {matches.slice(0, 3).map((match) => <Link to={`/profile/${match.id || match._id}`} key={match.id || match._id} className="glass-expert-row"><span className="glass-expert-avatar">{initials(match.name)}</span><span className="glass-expert-copy"><strong>{match.name}</strong><small>{match.matchedSkills?.join(', ') || 'Promising skill overlap'}</small></span><span className="glass-match-pill">{matchPercent(match.score)}% Match</span></Link>)}
-          </div>}
-          {!loading && matches.length === 0 && <div className="glass-empty">Add learning goals to unlock expert recommendations. <Link to="/edit-skills">Complete your profile</Link></div>}
+        <section className="foundry-card col-8">
+          <div className="foundry-card-heading"><h2>Recommended Peers</h2><Link to="/browse">DIRECTORY_VIEW</Link></div>
+          {loading ? <div className="foundry-empty">CALIBRATING_MATCH_ENGINE…</div> : <div className="foundry-peer-list">{matches.slice(0, 4).map((match) => <Link to={`/profile/${match.id || match._id}`} key={match.id || match._id} className="foundry-peer-row"><span className="foundry-peer-avatar">{initials(match.name)}</span><span className="foundry-peer-copy"><strong>{match.name}</strong><small>{match.matchedSkills?.join(', ') || 'Promising skill overlap'}</small></span><span className="foundry-match-code">MATCH_{matchPercent(match.score)}</span></Link>)}</div>}
+          {!loading && matches.length === 0 && <div className="foundry-empty">NO_SIGNALS · <Link to="/edit-skills">CONFIGURE_PROFILE</Link></div>}
         </section>
 
-        <aside className="glass-card col-4 glass-profile-strength">
-          <div className="glass-card-heading"><h2>Profile Strength</h2><strong>{profileScore}%</strong></div>
-          <div className="progress-bar-glass"><div className="progress-fill-glass" style={{ width: `${profileScore}%` }} /></div>
-          <p className="glass-muted">Add a specific bio, expertise, learning goals, and location to increase match quality.</p>
-          <Link to="/edit-skills" className="secondary-button glass-profile-link">Optimize Profile</Link>
+        <aside className="foundry-card col-4 foundry-tasks">
+          <div className="foundry-card-heading"><h2>System Tasks</h2><span>{profileScore}%</span></div>
+          <div className="foundry-task"><Icon name="spark" size={15}/><div><strong>Optimize Signal</strong><p>Complete your identity data to improve match quality.</p></div></div>
+          <div className="foundry-progress"><i style={{ width: `${profileScore}%` }}/></div>
+          <Link to="/edit-skills" className="primary-button">Configure Profile</Link>
         </aside>
       </div>
     </AppShell>

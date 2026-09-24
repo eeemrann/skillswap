@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Geist:wght@400;600;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Geist:wght@400;600;800&family=Geist+Mono:wght@400;500;600;700&display=swap');
 
 :root {
   /* DNA 1: OBSIDIAN FOUNDRY (Landing/Auth) */
@@ -17,6 +17,14 @@
   /* SHARED ACCENTS */
   --indigo-primary: #6366f1;
   --indigo-glow: rgba(99, 102, 241, 0.15);
+  --bg-absolute: #050505;
+  --bg-card: #0a0a0c;
+  --bg-card-hover: #0d0d10;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --text-main: #f4f4f5;
+  --text-muted: #8b8b95;
+  --brand-indigo: #6366f1;
 
   /* Legacy semantic aliases keep existing workspace screens on Glass DNA. */
   --brand-50: #eef2ff;
@@ -68,15 +76,16 @@ button, .primary-button, .secondary-button { transition: all 0.2s cubic-bezier(0
 
 /* FOUNDRY AUTH SYSTEM */
 .foundry-auth-page{display:grid;grid-template-columns:1.1fr .9fr;min-height:100dvh;background:#000;color:#fff}
-.foundry-auth-page .auth-visual-side{position:relative;min-height:100dvh;background:#000;padding:60px;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;border-right:1px solid var(--foundry-border)}
+.foundry-auth-page.auth-viewport-locked{width:100%;height:100dvh;min-height:0;grid-template-columns:1fr 1fr;overflow:hidden}
+.foundry-auth-page .auth-visual-side{position:relative;height:100%;min-height:0;background:#000;padding:40px;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;border-right:1px solid var(--foundry-border)}
 .auth-grid-overlay{position:absolute;inset:0;background-image:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1px);background-size:30px 30px;mask-image:linear-gradient(to right,black,transparent)}
 .auth-atmosphere-glow{position:absolute;bottom:-10%;left:-10%;width:60%;height:60%;background:radial-gradient(circle,rgba(99,102,241,.1) 0%,transparent 70%);filter:blur(40px)}
 .auth-visual-content{position:relative;z-index:10;height:100%;display:flex;flex-direction:column;justify-content:space-between}
-.auth-back-home{display:inline-flex;width:max-content;align-items:center;gap:10px;color:#fff;text-decoration:none}.auth-back-home .brand-mark-new{display:inline-flex}.auth-back-home .brand-word{font-size:14px;font-weight:800}.auth-statement .eyebrow{margin:0;color:var(--indigo-primary);font-size:12px;font-weight:700;letter-spacing:.1em}
-.auth-statement h2{font-size:clamp(38px,4vw,48px);font-weight:800;line-height:1.1;margin:16px 0;max-width:500px}.auth-description{color:#a1a1aa;font-size:18px;line-height:1.6;max-width:420px}.auth-footer-badge{display:flex;align-items:center;color:#71717a;font-size:12px;letter-spacing:.02em}
-.foundry-auth-page .auth-form-side{min-width:0;min-height:100dvh;background:#000;display:grid;place-items:center;padding:clamp(20px,4vw,48px)}.form-container-inner{width:100%;max-width:440px}.form-header-premium{text-align:center;margin-bottom:32px}.form-header-premium h1{color:#fff;font-size:32px;font-weight:700;margin:0 0 8px}.form-header-premium p{color:#71717a;margin:0;font-size:14px}.clerk-wrapper-foundry{width:100%}
-.auth-form-footer{margin-top:32px;text-align:center;font-size:13px;color:#71717a}.auth-form-footer p{margin:0}.auth-form-footer a{color:var(--indigo-primary);font-weight:600;text-decoration:none}.auth-form-footer a:hover{color:#818cf8}.secure-dot{width:8px;height:8px;flex:0 0 8px;background:#10b981;border-radius:50%;display:inline-block;margin-right:10px;box-shadow:0 0 10px #10b981}
+.auth-back-home{display:inline-flex;width:max-content;align-items:center;gap:10px;color:#fff;text-decoration:none}.auth-back-home .brand-mark-new{display:inline-flex}.auth-back-home .brand-word{font-size:14px;font-weight:800}.auth-statement .eyebrow{margin:0 0 8px;color:var(--indigo-primary);font-size:11px;font-weight:700;letter-spacing:.15em}
+.auth-statement h2{font-size:clamp(34px,3.5vw,42px);font-weight:800;line-height:1.1;margin:0 0 16px;max-width:500px}.auth-description{color:#a1a1aa;font-size:16px;line-height:1.5;max-width:380px}.auth-footer-badge{display:flex;align-items:center;color:#52525b;font-size:11px;letter-spacing:.02em}
+.foundry-auth-page .auth-form-side{min-width:0;height:100%;min-height:0;background:#050505;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;overflow-y:auto;overscroll-behavior:contain}.form-container-inner{width:100%;max-width:380px;margin:auto 0}.form-header-premium{text-align:center;margin-bottom:24px}.form-header-premium h1{color:#fff;font-size:28px;font-weight:700;margin:0 0 4px}.form-header-premium p{color:#71717a;margin:0;font-size:13px}.clerk-wrapper-foundry{width:100%}
+.auth-form-footer{margin-top:24px;text-align:center;font-size:12px;color:#71717a}.auth-form-footer p{margin:0}.auth-form-footer a{color:var(--indigo-primary);font-weight:600;text-decoration:none}.auth-form-footer a:hover{color:#818cf8}.secure-dot{width:6px;height:6px;flex:0 0 6px;background:#10b981;border-radius:50%;display:inline-block;margin-right:8px;box-shadow:0 0 8px #10b981}
 .fade-in{animation:foundry-auth-in .45s ease both}@keyframes foundry-auth-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-@media(max-width:1000px){.foundry-auth-page{grid-template-columns:1fr}.foundry-auth-page .auth-visual-side{display:none}.foundry-auth-page .auth-form-side{min-height:100dvh;padding:32px 20px}}
-@media(max-width:480px){.foundry-auth-page .auth-form-side{align-items:start;padding:24px 12px}.form-container-inner{max-width:100%}.form-header-premium{margin-bottom:24px}.form-header-premium h1{font-size:28px}.auth-form-footer{margin-top:24px}}
+@media(max-width:1000px){.foundry-auth-page,.foundry-auth-page.auth-viewport-locked{grid-template-columns:1fr}.foundry-auth-page .auth-visual-side{display:none}.foundry-auth-page .auth-form-side{height:100dvh;padding:24px 20px}}
+@media(max-width:480px){.foundry-auth-page .auth-form-side{justify-content:flex-start;padding:20px 12px}.form-container-inner{max-width:100%}.form-header-premium{margin-bottom:18px}.auth-form-footer{margin-top:18px}}
 @media(prefers-reduced-motion:reduce){.fade-in{animation:none}}

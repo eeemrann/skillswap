@@ -59,7 +59,7 @@ export default function OnboardingModal() {
     finally { setSaving(false); }
   };
 
-  return <div className="onboarding-backdrop"><section className="onboarding-modal onboarding-v2" role="dialog" aria-modal="true" aria-labelledby="onboarding-title" ref={dialogRef}>
+  return <div className="onboarding-backdrop foundry-onboarding"><section className="onboarding-modal onboarding-v2" role="dialog" aria-modal="true" aria-labelledby="onboarding-title" ref={dialogRef}>
     <div className="onboarding-step-indicator"><span className="active">01 Basics</span><hr/><span className={step === 2 ? 'active' : ''}>02 Skills</span></div>
     <form onSubmit={submit}>
       {step === 1 ? <div className="step-content animate-in"><p className="page-eyebrow">Set up your profile</p><h2 id="onboarding-title">Tell us about yourself.</h2><p>Give future exchange partners a useful, human introduction.</p><div className="onboarding-field"><label htmlFor="onboarding-bio">Your introduction</label><textarea id="onboarding-bio" value={bio} onChange={(event) => setBio(event.target.value)} maxLength="500" placeholder="I’m a product designer who loves teaching prototyping and wants to learn conversational Spanish…"/><small>{bio.length}/500</small></div>{error && <p className="onboarding-message error">{error}</p>}<button className="primary-button onboarding-next" type="button" onClick={continueToSkills}>Continue <Icon name="arrow" size={15}/></button></div>

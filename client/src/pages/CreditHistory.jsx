@@ -30,17 +30,17 @@ function CreditHistory() {
   }, { earned: 0, spent: 0 }), [ownId, transactions]);
 
   return (
-    <AppShell eyebrow="Financials" title="Time Ledger" description="A precise statement of your knowledge wealth and learning investments.">
+    <AppShell eyebrow="VERIFIED_TRANSACTIONS" title="Immutable Ledger" description="A precise statement of knowledge wealth and learning investment.">
       <div className="page-enter">
-        <div className="glass-bento-container ledger-kpi-grid">
-          <article className="glass-card col-4"><span className="glass-kicker">Current Balance</span><div className="kpi-value-glass">{currentUser?.creditBalance ?? 0} <small>hrs</small></div><p className="glass-muted">Ready for your next learning session</p></article>
-          <article className="glass-card col-4"><span className="glass-kicker ledger-earned-label">Lifetime Earned</span><div className="kpi-value-glass ledger-earned-value">+{totals.earned}</div><p className="glass-muted">Total expertise shared with the community</p></article>
-          <article className="glass-card col-4"><span className="glass-kicker">Learning Investment</span><div className="kpi-value-glass">{totals.spent}</div><p className="glass-muted">Credits utilized for self-growth</p></article>
+        <div className="foundry-grid-12 ledger-kpi-grid">
+          <article className="foundry-card col-4"><span className="mono-label">Current Balance</span><div className="mono-value">{currentUser?.creditBalance ?? 0} <small>HRS</small></div><p className="glass-muted">Ready for your next learning session</p></article>
+          <article className="foundry-card col-4"><span className="mono-label ledger-earned-label">Lifetime Earned</span><div className="mono-value ledger-earned-value">+{totals.earned}</div><p className="glass-muted">Total expertise shared with the community</p></article>
+          <article className="foundry-card col-4"><span className="mono-label">Learning Investment</span><div className="mono-value">{totals.spent}</div><p className="glass-muted">Credits utilized for self-growth</p></article>
         </div>
 
         {error && <p className="status-message error" role="alert">{error}</p>}
 
-        <section className="glass-card ledger-statement">
+        <section className="foundry-card ledger-statement foundry-ledger">
           <header className="ledger-statement-header"><div><h2>Transaction History</h2><p>A complete record of your time-credit movement.</p></div><span>{transactions.length} {transactions.length === 1 ? 'Transaction' : 'Transactions'}</span></header>
           <div className="ledger-column-head" aria-hidden="true"><span>Counterparty</span><span>Movement</span><span>Date</span><span>Amount</span></div>
           <div className="ledger-rows">

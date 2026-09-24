@@ -66,7 +66,7 @@ function AdminDashboard() {
   const messageIsError = /denied|could not|failed|invalid|required/i.test(message);
 
   return (
-    <AppShell eyebrow="Operations" title="Command Center" description="Total oversight of exchange health, platform momentum, and member access.">
+    <AppShell eyebrow="OPERATIONS_LIVE" title="Control Tower" description="Total oversight of exchange health, platform momentum, and member access.">
       <div className="page-enter">
         {message && <div className={`admin-alert ${messageIsError ? 'error' : 'success'}`} role="status"><span>{messageIsError ? '!' : '✓'}</span>{message}</div>}
 
@@ -74,7 +74,7 @@ function AdminDashboard() {
           {metrics.map((metric) => <article key={metric.key} className="admin-metric-card"><div className="admin-metric-head"><span>{metric.label}</span><Icon name={metric.icon} size={15}/></div><strong>{loading ? '—' : stats?.[metric.key] ?? '—'}</strong><small>{metric.detail}</small></article>)}
         </section>
 
-        <section className="glass-card admin-command-table">
+        <section className="foundry-card admin-command-table foundry-admin-table">
           <header className="admin-command-header"><div><h2>Member Directory</h2><p>Identity, access state, role, and governance controls.</p></div><div className="admin-command-tools"><label><Icon name="search" size={14}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search members…" aria-label="Search members"/>{query && <button type="button" onClick={() => setQuery('')} aria-label="Clear search">&times;</button>}</label><span>{visibleUsers.length} of {users.length}</span></div></header>
 
           <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Member</th><th>Status</th><th>Role</th><th>Joined</th><th>Actions</th></tr></thead><tbody>{visibleUsers.map((user) => {

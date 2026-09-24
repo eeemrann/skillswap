@@ -94,10 +94,10 @@ function Bookings() {
     const alreadyReviewed = reviewedIds.includes(booking._id);
     const isActing = actingId === booking._id;
 
-    return <article className={`timeline-card growth-timeline-card ${booking.status}`} key={booking._id}>
+    return <article className={`foundry-card timeline-card growth-timeline-card ${booking.status}`} key={booking._id}>
       <div className="timeline-card-main">
         <div className="timeline-date-box"><span>{date.toLocaleDateString([], { month: 'short' })}</span><strong>{date.toLocaleDateString([], { day: '2-digit' })}</strong></div>
-        <div className="timeline-copy"><div className="timeline-meta"><span className={`status-badge-glass ${booking.status}`}>{booking.status}</span><span>{date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div><h3>{booking.skill}</h3><p>{isTeaching ? 'Teaching' : 'Learning from'} <strong>{otherName}</strong></p></div>
+        <div className="timeline-copy"><div className="timeline-meta"><span className={`f-badge ${booking.status === 'accepted' || booking.status === 'completed' ? 'active' : 'pending'}`}>{booking.status}</span><span>{date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div><h3>{booking.skill}</h3><p>{isTeaching ? 'Teaching' : 'Learning from'} <strong>{otherName}</strong></p></div>
       </div>
       <div className="booking-actions-group">
         {isTeaching && booking.status === 'pending' && <div className="action-pair"><button className="primary-button" type="button" disabled={isActing} onClick={() => respond(booking._id, 'accepted')}>Accept</button><button className="secondary-button" type="button" disabled={isActing} onClick={() => respond(booking._id, 'declined')}>Decline</button></div>}
@@ -106,11 +106,11 @@ function Bookings() {
         {booking.status === 'completed' && !alreadyReviewed && !isReviewing && <button className="secondary-button" type="button" onClick={() => setReviewingId(booking._id)}>Review</button>}
         {booking.status === 'completed' && alreadyReviewed && <span className="reviewed-label">Reviewed <span aria-hidden="true">✓</span></span>}
       </div>
-      {isReviewing && <div className="timeline-review glass-card"><div><strong>How was the exchange?</strong><p>Your feedback helps maintain a thoughtful expert community.</p></div><div className="star-rating" role="radiogroup" aria-label="Rating">{[1, 2, 3, 4, 5].map((value) => <button type="button" role="radio" aria-checked={rating === value} aria-label={`${value} stars`} className={value <= rating ? 'active' : ''} key={value} onClick={() => setRating(value)}>★</button>)}</div><textarea className="review-textarea" placeholder="Add your feedback…" value={comment} onChange={(event) => setComment(event.target.value)}/><div className="stack-actions"><button className="primary-button" type="button" disabled={isActing} onClick={() => submitReview(booking._id)}>{isActing ? 'Submitting…' : 'Submit review'}</button><button className="ghost-button" type="button" onClick={() => setReviewingId(null)}>Cancel</button></div></div>}
+      {isReviewing && <div className="timeline-review foundry-card"><div><strong>How was the exchange?</strong><p>Your feedback helps maintain a thoughtful expert community.</p></div><div className="star-rating" role="radiogroup" aria-label="Rating">{[1, 2, 3, 4, 5].map((value) => <button type="button" role="radio" aria-checked={rating === value} aria-label={`${value} stars`} className={value <= rating ? 'active' : ''} key={value} onClick={() => setRating(value)}>★</button>)}</div><textarea className="review-textarea foundry-textarea" placeholder="Add your feedback…" value={comment} onChange={(event) => setComment(event.target.value)}/><div className="stack-actions"><button className="primary-button" type="button" disabled={isActing} onClick={() => submitReview(booking._id)}>{isActing ? 'Submitting…' : 'Submit review'}</button><button className="ghost-button" type="button" onClick={() => setReviewingId(null)}>Cancel</button></div></div>}
     </article>;
   };
 
-  return <AppShell eyebrow="Schedule" title="Growth Queue" description="Two focused streams for the expertise you share and the knowledge you pursue." action={<Link className="primary-button" to="/browse">Find an expert <Icon name="arrow" size={15}/></Link>}>
+  return <AppShell eyebrow="QUEUE_MANAGEMENT" title="Strategic Timeline" description="Inbound expertise requests and outbound knowledge acquisition." action={<Link className="primary-button" to="/browse">Find an expert <Icon name="arrow" size={15}/></Link>}>
     {message && <p className={`status-message ${/failed|action|insufficient|could not/i.test(message) ? 'error' : ''}`} role="status">{message}</p>}
     <div className="booking-summary"><span><strong>{teaching.filter((item) => item.status === 'pending').length}</strong> requests need attention</span><span><strong>{learning.filter((item) => item.status === 'accepted').length}</strong> sessions ready to complete</span></div>
     <div className="strategic-timeline page-enter">

@@ -93,9 +93,9 @@ function Messages() {
   const ownId = currentUser?._id || currentUser?.id;
 
   return (
-    <AppShell eyebrow="Messenger" title="Direct Exchange" description="A private, high-signal workspace for your active learning relationships.">
+    <AppShell eyebrow="TERMINAL_SESSION" title="Communication" description="A private high-signal channel for active exchange partners.">
       {error && <p className="status-message error" role="alert">{error}</p>}
-      <div className="chat-hub-container page-enter">
+      <div className="chat-hub-container foundry-terminal page-enter">
         <aside className="convo-rail">
           <header className="convo-rail-header"><span className="section-eyebrow">Conversations</span><small>{connections.length}</small></header>
           <div className="convo-list">
@@ -113,10 +113,10 @@ function Messages() {
               {!loadingMessages && messages.length === 0 && <div className="chat-placeholder compact"><strong>Start the conversation</strong><span>Share context about your upcoming exchange.</span></div>}
               {messages.map((message) => {
                 const isMe = entityId(message.sender) === ownId;
-                return <div key={message._id} className={`message-bubble-glass ${isMe ? 'me' : 'partner'}`}><span>{message.body}</span><time>{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></div>;
+                return <div key={message._id} className={`msg-bubble ${isMe ? 'msg-me' : 'msg-them'}`}><span>{message.body}</span><time>{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></div>;
               })}
             </div>
-            <div className="chat-input-wrapper"><form className="chat-command-bar" onSubmit={onSend}><label className="sr-only" htmlFor="message-body">Write a message</label><input id="message-body" placeholder={`Message ${activePartner.name}…`} value={body} onChange={(event) => setBody(event.target.value)} maxLength="2000" required/><button type="submit" className="primary-button" disabled={!body.trim() || sending}>{sending ? 'Sending…' : 'Send'}</button></form></div>
+            <div className="chat-input-wrapper"><form className="chat-command-bar" onSubmit={onSend}><label className="sr-only" htmlFor="message-body">Write a message</label><input id="message-body" className="foundry-input" placeholder={`Message ${activePartner.name}...`} value={body} onChange={(event) => setBody(event.target.value)} maxLength="2000" required/><button type="submit" className="primary-button" disabled={!body.trim() || sending}>{sending ? 'SENDING...' : 'SEND'}</button></form></div>
           </>}
         </section>
       </div>

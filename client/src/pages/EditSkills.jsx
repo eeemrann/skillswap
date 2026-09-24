@@ -73,24 +73,24 @@ export default function EditSkills() {
   const isError = /failed|valid|must|use |later than/i.test(message);
 
   return (
-    <AppShell eyebrow="Profile Studio" title="Expert Identity" description="Build the profile that represents your knowledge across the exchange.">
+    <AppShell eyebrow="DOSSIER_CONFIG" title="Configuration" description="Build the technical identity that represents your expertise across the exchange.">
       <div className="settings-layout page-enter">
-        <form className="configuration-form" onSubmit={handleSubmit} aria-busy={loading}>
+        <form className="configuration-form foundry-card foundry-configuration" onSubmit={handleSubmit} aria-busy={loading}>
           {message && <div className={`studio-message ${isError ? 'error' : 'success'}`} role="status"><span>{isError ? '!' : '✓'}</span>{message}</div>}
 
           <SettingsSection title="Professional Bio" description="Describe your expertise and what makes an exchange with you valuable.">
-            <div className="input-group-premium"><label htmlFor="studio-bio">Public introduction</label><textarea id="studio-bio" className="glass-input glass-textarea" placeholder="I am a senior engineer specializing in system design…" value={form.bio} onChange={(event) => update('bio', event.target.value)} maxLength="500"/><small>{form.bio.length}/500 characters</small></div>
+            <div className="input-group-premium"><label htmlFor="studio-bio">Public introduction</label><textarea id="studio-bio" className="foundry-input foundry-textarea" placeholder="I am a senior engineer specializing in system design..." value={form.bio} onChange={(event) => update('bio', event.target.value)} maxLength="500"/><small>{form.bio.length}/500 characters</small></div>
           </SettingsSection>
 
           <SettingsSection title="The Exchange" description="List the skills you are ready to mentor and those you want to acquire.">
-            <div className="input-group-premium"><label htmlFor="studio-offered">I can teach</label><input id="studio-offered" className="glass-input" value={form.skillsOffered} onChange={(event) => update('skillsOffered', event.target.value)} placeholder="React, Figma, leadership…"/><div className="studio-tags">{offered.map((skill) => <span key={skill}>{skill}</span>)}</div></div>
-            <div className="input-group-premium"><label htmlFor="studio-wanted">I want to learn</label><input id="studio-wanted" className="glass-input" value={form.skillsWanted} onChange={(event) => update('skillsWanted', event.target.value)} placeholder="Public speaking, Spanish…"/><div className="studio-tags wanted">{wanted.map((skill) => <span key={skill}>{skill}</span>)}</div></div>
+            <div className="input-group-premium"><label htmlFor="studio-offered">I can teach</label><input id="studio-offered" className="foundry-input" value={form.skillsOffered} onChange={(event) => update('skillsOffered', event.target.value)} placeholder="React, Figma, leadership..."/><div className="studio-tags">{offered.map((skill) => <span key={skill}>{skill}</span>)}</div></div>
+            <div className="input-group-premium"><label htmlFor="studio-wanted">I want to learn</label><input id="studio-wanted" className="foundry-input" value={form.skillsWanted} onChange={(event) => update('skillsWanted', event.target.value)} placeholder="Public speaking, Spanish..."/><div className="studio-tags wanted">{wanted.map((skill) => <span key={skill}>{skill}</span>)}</div></div>
           </SettingsSection>
 
           <SettingsSection title="Availability & Logistics" description="Set your location, timezone, and preferred exchange windows.">
-            <div className="studio-columns"><div className="input-group-premium"><label htmlFor="studio-city">City</label><input id="studio-city" className="glass-input" value={form.city} onChange={(event) => update('city', event.target.value)} placeholder="Dhaka"/></div><div className="input-group-premium"><label htmlFor="studio-country">Country</label><input id="studio-country" className="glass-input" value={form.country} onChange={(event) => update('country', event.target.value)} placeholder="Bangladesh"/></div></div>
-            <div className="input-group-premium"><label htmlFor="studio-timezone">Timezone</label><input id="studio-timezone" className="glass-input" value={form.timezone} onChange={(event) => update('timezone', event.target.value)} placeholder="Asia/Dhaka"/></div>
-            <div className="input-group-premium"><label htmlFor="studio-availability">Weekly schedule</label><input id="studio-availability" className="glass-input" value={form.availability} onChange={(event) => update('availability', event.target.value)} placeholder="monday 09:00-11:00, wednesday 14:00-16:00"/><small>Format: day HH:MM-HH:MM, separated by commas.</small></div>
+            <div className="studio-columns"><div className="input-group-premium"><label htmlFor="studio-city">City</label><input id="studio-city" className="foundry-input" value={form.city} onChange={(event) => update('city', event.target.value)} placeholder="Dhaka"/></div><div className="input-group-premium"><label htmlFor="studio-country">Country</label><input id="studio-country" className="foundry-input" value={form.country} onChange={(event) => update('country', event.target.value)} placeholder="Bangladesh"/></div></div>
+            <div className="input-group-premium"><label htmlFor="studio-timezone">Timezone</label><input id="studio-timezone" className="foundry-input" value={form.timezone} onChange={(event) => update('timezone', event.target.value)} placeholder="Asia/Dhaka"/></div>
+            <div className="input-group-premium"><label htmlFor="studio-availability">Weekly schedule</label><input id="studio-availability" className="foundry-input" value={form.availability} onChange={(event) => update('availability', event.target.value)} placeholder="monday 09:00-11:00, wednesday 14:00-16:00"/><small>Format: day HH:MM-HH:MM, separated by commas.</small></div>
           </SettingsSection>
 
           <footer className="configuration-actions"><button type="submit" className="primary-button" disabled={isSaving || loading}>{isSaving ? 'Synchronizing…' : 'Save Profile Changes'}<Icon name="arrow" size={14}/></button><button type="button" className="secondary-button" onClick={() => navigate('/dashboard')}>Discard</button></footer>
@@ -98,7 +98,7 @@ export default function EditSkills() {
 
         <aside className="sticky-preview">
           <span className="preview-card-label">Live Expert Card</span>
-          <article className="expert-card-glass studio-preview-card">
+          <article className="expert-card-foundry studio-preview-card">
             <div className="avatar-lg">{previewInitials || 'SS'}</div>
             <div className="expert-card-body"><h3>{displayName}</h3><p className="expert-card-meta">{[form.city, form.country].filter(Boolean).join(', ') || 'Global Location'} <span>•</span> Available Mentor</p><p className="expert-card-bio-glass">{form.bio || 'Your professional bio will preview here as you write it.'}</p></div>
             <div className="expert-card-skills">{offered.length ? offered.slice(0, 3).map((skill) => <span key={skill} className="skill-tag-glass">{skill}</span>) : <span className="skill-count-glass">Add your first skill</span>}</div>
