@@ -3,6 +3,12 @@ import { Brand } from '../components/AppShell';
 import Icon from '../components/Icon';
 import './Landing.css';
 
+const signals = [
+  { value: '1:1', label: 'Time exchange' },
+  { value: 'LOCAL', label: 'Or worldwide' },
+  { value: '0%', label: 'Platform fees' },
+];
+
 function Landing() {
   return (
     <div className="foundry-root">
@@ -17,39 +23,38 @@ function Landing() {
         </div>
       </nav>
 
-      <section className="foundry-hero">
-        <div className="hero-atmosphere" />
-        <div className="hero-grid-lines" />
-        <div className="hero-content">
-          <div className="foundry-badge">
-            <span className="badge-glow" />
-            <span className="badge-text">v2.0 — The Expert Exchange</span>
+      <main>
+        <section className="foundry-hero">
+          <div className="hero-atmosphere" />
+          <div className="hero-grid-lines" />
+          <div className="hero-content">
+            <div className="foundry-badge"><span className="badge-glow" /><span className="badge-text">The Expert Exchange</span></div>
+            <h1 className="hero-main-title">The market for<br /><span className="indigo-gradient-text">human expertise.</span></h1>
+            <p className="hero-sub-text">Trade focused time with people who know their craft. No currency, subscriptions, or noisy feeds—just useful knowledge exchanged directly.</p>
+            <div className="hero-btn-group">
+              <Link to="/register" className="btn-foundry-primary">Start exchanging</Link>
+              <a href="#method" className="btn-foundry-secondary">Explore the method <Icon name="arrow" size={16} /></a>
+            </div>
+            <div className="hero-signal-row" aria-label="Platform highlights">
+              {signals.map((signal) => <div key={signal.label}><strong>{signal.value}</strong><span>{signal.label}</span></div>)}
+            </div>
           </div>
-          <h1 className="hero-main-title">The market for <br /><span className="indigo-gradient-text">human expertise.</span></h1>
-          <p className="hero-sub-text">SkillSwap is a precision-engineered platform for trading high-signal skills. No currency. No subscriptions. Just focused time between experts.</p>
-          <div className="hero-btn-group">
-            <Link to="/register" className="btn-foundry-primary">Get Started free</Link>
-            <a href="#method" className="btn-foundry-secondary"><Icon name="arrow" size={16} /> How it works</a>
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="foundry-bento" id="method">
-        <div className="bento-header"><p className="eyebrow">The Foundry</p><h2>Engineered for useful growth.</h2></div>
-        <div className="bento-grid">
-          <div className="bento-card-large">
-            <div className="card-viz" aria-hidden="true"><div className="viz-box"><div className="viz-line" /><div className="viz-line short" /></div><div className="viz-pulse">+1.0</div></div>
-            <h3>Atomic Time Credits</h3><p>A simple, immutable ledger. One hour taught is one hour earned. No math, no inflation.</p>
+        <section className="foundry-bento" id="method">
+          <div className="bento-header"><p className="eyebrow">How it works</p><h2>A focused system for useful growth.</h2><p>Every interaction is designed to move expertise between people with clarity and trust.</p></div>
+          <div className="bento-grid">
+            <article className="bento-card-large">
+              <div className="card-viz" aria-hidden="true"><div className="viz-box"><div className="viz-line" /><div className="viz-line short" /></div><div className="viz-pulse">+1.0</div></div>
+              <span className="card-index">01 / LEDGER</span><h3>Atomic Time Credits</h3><p>One hour taught becomes one hour available to learn. The ledger stays simple, transparent, and useful.</p>
+            </article>
+            <article className="bento-card-small"><span className="feature-icon"><Icon name="search" size={22} /></span><span className="card-index">02 / DISCOVERY</span><h3>Proximity Engine</h3><p>Find relevant expertise nearby, or expand the search to a worldwide network.</p></article>
+            <article className="bento-card-small"><span className="feature-icon coral"><Icon name="message" size={22} /></span><span className="card-index">03 / SIGNAL</span><h3>Focused Communication</h3><p>Messaging opens around confirmed exchanges so conversations remain purposeful.</p></article>
           </div>
-          <div className="bento-card-small"><Icon name="search" size={24} className="indigo-icon" /><h3>Proximity Engine</h3><p>Smart geospatial matching for local and worldwide expertise.</p></div>
-          <div className="bento-card-small"><Icon name="message" size={24} className="indigo-icon" /><h3>Signal Only</h3><p>Gated messaging ensures communication only happens when a match is confirmed.</p></div>
-        </div>
-      </section>
+        </section>
+      </main>
 
-      <footer className="foundry-footer">
-        <Link to="/" className="foundry-brand" aria-label="SkillSwap home"><Brand /></Link>
-        <p className="footer-copy">© 2024 SkillSwap. Precise Knowledge Exchange.</p>
-      </footer>
+      <footer className="foundry-footer"><Link to="/" className="foundry-brand" aria-label="SkillSwap home"><Brand /></Link><p className="footer-copy">© {new Date().getFullYear()} SkillSwap. Precise knowledge exchange.</p></footer>
     </div>
   );
 }

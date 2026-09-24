@@ -14,7 +14,11 @@ function AuthLayout({ children, mode }) {
           <div className="auth-statement">
             <p className="eyebrow">Expertise Vault</p>
             <h2>{isLogin ? 'Welcome back to the exchange.' : 'Join the next generation.'}</h2>
-            <p className="auth-description">Access a global network of focused professionals trading niche expertise.</p>
+            <p className="auth-description">Access a focused network of professionals exchanging practical, niche expertise.</p>
+            <div className="auth-proof-grid" aria-label="Platform benefits">
+              <div><strong>1:1</strong><span>Fair time exchange</span></div>
+              <div><strong>DIRECT</strong><span>Expert to expert</span></div>
+            </div>
           </div>
           <div className="auth-footer-badge"><span className="secure-dot" />Encrypted Session Active</div>
         </div>
@@ -23,8 +27,8 @@ function AuthLayout({ children, mode }) {
       <section className="auth-form-side">
         <div className="form-container-inner fade-in">
           <header className="form-header-premium">
-            <h1>{isLogin ? 'Sign In' : 'Register'}</h1>
-            <p>{isLogin ? 'Provide your credentials' : 'Create your expert profile'}</p>
+            <h1>{isLogin ? 'Welcome back' : 'Create your account'}</h1>
+            <p>{isLogin ? 'Sign in to continue to your workspace.' : 'Join the expert exchange in a few steps.'}</p>
           </header>
           <div className="clerk-wrapper-foundry">{children}</div>
           <footer className="auth-form-footer"><p>{isLogin ? 'New here?' : 'Already a member?'}{' '}<Link to={isLogin ? '/register' : '/login'}>{isLogin ? 'Create account' : 'Log in'}</Link></p></footer>
