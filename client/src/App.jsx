@@ -20,7 +20,11 @@ import AdminDashboard from './pages/AdminDashboard';
 import UserProfile from './pages/UserProfile';
 import OnboardingModal from './components/OnboardingModal';
 
-function LoadingScreen() { return <div className="loading-screen">Loading workspace...</div>; }
+function LoadingScreen() { return <div className="loading-screen" role="status"><span className="loading-spinner" aria-hidden="true" />Loading workspace…</div>; }
+
+function SyncError({ message, onRetry }) {
+  return <main className="workspace-error"><div><span>Connection interrupted</span><h1>We couldn’t open your workspace.</h1><p>{message}</p><button className="primary-button" type="button" onClick={onRetry}>Try again</button></div></main>;
+}
 
 export function ClerkRouterProvider({ children }) {
   const navigate = useNavigate();
@@ -54,17 +58,19 @@ function AppRoutes() {
   const dispatch = useDispatch();
   const user = useSelector((state) => state.auth.user);
   const [isSynced, setIsSynced] = useState(false);
+  const [syncError, setSyncError] = useState('');
+  const [syncAttempt, setSyncAttempt] = useState(0);
 
   useEffect(() => {
     if (!isLoaded) return undefined;
     setClerkTokenGetter(getToken);
     if (!isSignedIn) {
       dispatch(logout());
-      queueMicrotask(() => setIsSynced(true));
+      queueMicrotask(() => { setSyncError(''); setIsSynced(true); });
       return undefined;
     }
     let active = true;
-    queueMicrotask(() => setIsSynced(false));
+    queueMicrotask(() => { setSyncError(''); setIsSynced(false); });
     const initializeSession = async () => {
       try {
         const token = await getToken();
@@ -75,12 +81,14 @@ function AppRoutes() {
         dispatch(fetchUnreadCounts());
         setIsSynced(true);
       } catch (error) {
-        if (active) console.error('Failed to sync MongoDB user record:', error);
+        if (active) setSyncError(error.response?.data?.message || 'The server could not synchronize your account. Check your connection and try again.');
       }
     };
     initializeSession();
     return () => { active = false; };
-  }, [dispatch, getToken, isLoaded, isSignedIn]);
+  }, [dispatch, getToken, isLoaded, isSignedIn, syncAttempt]);
+
+  if (isLoaded && isSignedIn && syncError) return <SyncError message={syncError} onRetry={() => setSyncAttempt((attempt) => attempt + 1)} />;
 
   return <Routes>
     <Route path="/" element={<Landing />} />

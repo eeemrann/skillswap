@@ -53,23 +53,44 @@ function Browse() {
     return () => { active = false; window.removeEventListener('focus', refresh); };
   }, [radiusKm]);
 
-  const filteredUsers = useMemo(() => {
+  const filtered = useMemo(() => {
     const search = query.trim().toLowerCase();
     if (!search) return users;
-    return users.filter((user) => `${user.name} ${(user.skillsOffered || []).join(' ')} ${(user.skillsWanted || []).join(' ')}`.toLowerCase().includes(search));
+    return users.filter((user) => `${user.name || ''} ${(user.skillsOffered || []).join(' ')} ${(user.skillsWanted || []).join(' ')}`.toLowerCase().includes(search));
   }, [users, query]);
 
-  return (
-    <AppShell eyebrow="Marketplace" title="Discover expertise" description="Find people who have mastered the skills you want to learn." action={<label className="radius-control-premium"><Icon name="search" size={14}/><span className="sr-only">Search radius</span><select value={radiusKm} onChange={(event) => dispatch(setRadiusKm(event.target.value === 'worldwide' ? 'worldwide' : Number(event.target.value)))}>{SEARCH_RADIUS_OPTIONS.map((option) => <option key={option} value={option}>{option === 'worldwide' ? 'Worldwide' : `${option} km`}</option>)}</select></label>}>
-      <div className="expert-search-wrap"><Icon name="search" size={20}/><input className="search-input-premium" placeholder="Search by name or skill — JavaScript, design, cooking…" value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Search experts"/>{query && <button type="button" onClick={() => setQuery('')} aria-label="Clear search">&times;</button>}</div>
+  const radiusControl = (
+    <label className="radius-pill-glass">
+      <Icon name="search" size={14} />
+      <span className="sr-only">Search radius</span>
+      <select value={radiusKm} onChange={(event) => dispatch(setRadiusKm(event.target.value === 'worldwide' ? 'worldwide' : Number(event.target.value)))}>
+        {SEARCH_RADIUS_OPTIONS.map((option) => <option key={option} value={option}>{option === 'worldwide' ? 'Worldwide' : `${option} km`}</option>)}
+      </select>
+    </label>
+  );
 
-      <div className="directory-meta"><span>{loading ? 'Loading directory…' : `${filteredUsers.length} ${filteredUsers.length === 1 ? 'expert' : 'experts'}`}</span><span>{radiusKm === 'worldwide' ? 'Global directory' : locationActive ? `Within ${radiusKm} km` : 'Location unavailable — showing broader results'}</span></div>
+  return (
+    <AppShell eyebrow="Marketplace" title="Discover Expertise" description="Explore specialists, their work, and the knowledge they are ready to share." action={radiusControl}>
+      <div className="glass-search-container page-enter">
+        <Icon name="search" size={20} className="glass-search-icon" />
+        <input className="glass-search-input" placeholder="Search by expert name or specific skill…" value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Search experts" />
+        {query && <button className="glass-search-clear" type="button" onClick={() => setQuery('')} aria-label="Clear search">&times;</button>}
+      </div>
+
+      <div className="glass-directory-meta"><span>{loading ? 'Loading directory…' : `${filtered.length} ${filtered.length === 1 ? 'expert' : 'experts'}`}</span><span>{radiusKm === 'worldwide' ? 'Global directory' : locationActive ? `Within ${radiusKm} km` : 'Location unavailable — showing broader results'}</span></div>
       {error && <p className="status-message error">{error}</p>}
 
-      {loading ? <div className="expert-directory-grid">{[1, 2, 3, 4, 5, 6].map((item) => <div className="expert-directory-card expert-card-skeleton" key={item}><i/><i/><i/></div>)}</div>
-        : noNearbyUsers ? <div className="bento-empty directory-empty"><Icon name="users" size={24}/><strong>No nearby experts yet</strong><span>Expand your radius to discover more community members.</span><button className="secondary-button" type="button" onClick={() => dispatch(setRadiusKm('worldwide'))}>Search worldwide</button></div>
-          : filteredUsers.length === 0 ? <div className="bento-empty directory-empty"><Icon name="search" size={24}/><strong>No experts match “{query}”</strong><span>Try a broader skill or search by member name.</span></div>
-            : <div className="expert-directory-grid">{filteredUsers.map((user) => <Link className="expert-directory-card lift" to={`/profile/${user._id}`} key={user._id}><div className="expert-card-head"><span className="expert-card-avatar">{initials(user.name)}</span><span><strong>{user.name}</strong><small>{user.location?.city ? `${user.location.city}${user.location.country ? `, ${user.location.country}` : ''}` : 'Global member'}</small></span><Icon name="arrow" size={16}/></div>{user.bio && <p className="expert-card-bio">{user.bio}</p>}<div className="expert-card-divider"/><small className="expert-card-label">Expertise</small><div className="expert-skill-list">{(user.skillsOffered || []).slice(0, 3).map((skill) => <span key={skill}>{skill}</span>)}{(user.skillsOffered?.length || 0) > 3 && <em>+{user.skillsOffered.length - 3} more</em>}{!user.skillsOffered?.length && <em>Profile in progress</em>}</div>{user.reviewCount > 0 && <span className="expert-rating">★ {user.averageRating} · {user.reviewCount} reviews</span>}</Link>)}</div>}
+      {loading ? <div className="portfolio-grid">{[1, 2, 3, 4, 5, 6].map((item) => <div key={item} className="expert-profile-loading" />)}</div>
+        : noNearbyUsers ? <div className="glass-directory-empty"><Icon name="users" size={24}/><strong>No nearby experts yet</strong><span>Expand your radius to discover more community members.</span><button className="secondary-button" type="button" onClick={() => dispatch(setRadiusKm('worldwide'))}>Search worldwide</button></div>
+          : filtered.length === 0 ? <div className="glass-directory-empty"><Icon name="search" size={24}/><strong>No experts match “{query}”</strong><span>Try a broader skill or search by member name.</span></div>
+            : <div className="portfolio-grid page-enter">{filtered.map((user) => {
+              const skills = user.skillsOffered || [];
+              return <Link to={`/profile/${user._id}`} key={user._id} className="expert-card-glass">
+                <span className="avatar-lg">{initials(user.name)}</span>
+                <div className="expert-card-body"><h3>{user.name}</h3><p className="expert-card-meta">{user.location?.city || 'Global member'} <span>•</span> {user.reviewCount || 0} reviews</p><p className="expert-card-bio-glass">{user.bio || 'No professional bio provided yet.'}</p></div>
+                <div className="expert-card-skills">{skills.slice(0, 2).map((skill) => <span key={skill} className="skill-tag-glass">{skill}</span>)}{skills.length > 2 && <span className="skill-count-glass">+{skills.length - 2}</span>}{skills.length === 0 && <span className="skill-count-glass">Profile in progress</span>}</div>
+              </Link>;
+            })}</div>}
     </AppShell>
   );
 }

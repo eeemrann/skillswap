@@ -21,10 +21,9 @@ export const setClerkTokenGetter = (getter) => {
 export const bindClerkTokenGetter = setClerkTokenGetter;
 
 api.interceptors.request.use(async (config) => {
-  let token = null;
   if (clerkTokenGetter) {
     try {
-      token = await clerkTokenGetter();
+      const token = await clerkTokenGetter();
       if (token) {
         config.headers = config.headers || {};
         config.headers.Authorization = `Bearer ${token}`;
@@ -33,8 +32,6 @@ api.interceptors.request.use(async (config) => {
         console.warn('[Axios] Failed to get session token:', error.message);
     }
   }
-  // TEMP AUTH DEBUG: remove after diagnosing intermittent 401 responses.
-  console.log('[Auth Debug]', config.url, 'token:', token ? `${token.slice(0, 20)}...` : 'MISSING');
   return config;
 });
 

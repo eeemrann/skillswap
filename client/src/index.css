@@ -54,7 +54,10 @@
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
-body { margin: 0; padding: 0; min-width: 320px; -webkit-font-smoothing: antialiased; }
+body { margin: 0; padding: 0; min-width: 320px; min-height: 100dvh; -webkit-font-smoothing: antialiased; }
+img, svg, video, canvas { max-width: 100%; }
+input, textarea, select, button { font: inherit; }
+button, a, input, textarea, select { -webkit-tap-highlight-color: transparent; }
 h1, h2, h3, .brand-word { font-family: 'Geist', sans-serif; letter-spacing: -0.04em; }
 button, .primary-button, .secondary-button { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; }
 
@@ -62,3 +65,17 @@ button, .primary-button, .secondary-button { transition: all 0.2s cubic-bezier(0
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition-duration: 0.01ms !important; }
 }
+
+/* FOUNDRY AUTH SYSTEM */
+.foundry-auth-page{display:grid;grid-template-columns:1.1fr .9fr;min-height:100vh;background:var(--foundry-bg);color:#fff}
+.foundry-auth-page .auth-visual-side{position:relative;min-height:100vh;background:#000;padding:60px;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;border-right:1px solid var(--foundry-border)}
+.auth-grid-overlay{position:absolute;inset:0;background-image:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1px);background-size:30px 30px;mask-image:linear-gradient(to right,black,transparent)}
+.auth-atmosphere-glow{position:absolute;bottom:-10%;left:-10%;width:60%;height:60%;background:radial-gradient(circle,rgba(99,102,241,.1) 0%,transparent 70%);filter:blur(40px)}
+.auth-visual-content{position:relative;z-index:10;height:100%;display:flex;flex-direction:column;justify-content:space-between}
+.auth-back-home{display:inline-flex;width:max-content;align-items:center;gap:10px;color:#fff;text-decoration:none}.auth-back-home .brand-mark-new{display:inline-flex}.auth-back-home .brand-word{font-size:14px;font-weight:800}.auth-statement .eyebrow{margin:0}
+.auth-statement h2{font-size:52px;line-height:1.1;margin:20px 0;max-width:500px}.auth-description{color:var(--foundry-muted);font-size:18px;line-height:1.6;max-width:400px}.auth-footer-badge{color:var(--foundry-muted);font-size:12px;letter-spacing:.02em}
+.foundry-auth-page .auth-form-side{min-width:0;min-height:100vh;background:#050505;display:grid;place-items:center;padding:40px}.form-container-inner{width:100%;max-width:400px}.form-header-premium h1{font-size:32px;margin:0 0 8px}.form-header-premium p{color:var(--foundry-muted);margin:0 0 40px;font-size:14px}.clerk-wrapper-foundry{width:100%}
+.auth-form-footer{margin-top:32px;text-align:center;font-size:13px;color:var(--foundry-muted)}.auth-form-footer p{margin:0}.auth-form-footer a{color:var(--indigo-primary);font-weight:600;text-decoration:none}.auth-form-footer a:hover{color:#818cf8}.secure-dot{width:8px;height:8px;background:#10b981;border-radius:50%;display:inline-block;margin-right:10px;box-shadow:0 0 10px #10b981}
+.fade-in{animation:foundry-auth-in .45s ease both}@keyframes foundry-auth-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media(max-width:1000px){.foundry-auth-page{grid-template-columns:1fr}.foundry-auth-page .auth-visual-side{display:none}.foundry-auth-page .auth-form-side{min-height:100vh;padding:40px 20px}}
+@media(prefers-reduced-motion:reduce){.fade-in{animation:none}}

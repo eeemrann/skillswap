@@ -3,10 +3,38 @@ import { Brand } from './AppShell';
 
 function AuthLayout({ children, mode }) {
   const isLogin = mode === 'login';
-  return <main className="auth-page-premium">
-    <section className="auth-story-dark"><div className="auth-grid-background"/><Link className="auth-brand-new" to="/"><Brand/></Link><div className="auth-story-main"><p>Knowledge compounds</p><h2>Grow together.<br/><span>One hour at a time.</span></h2><div>Join a global network of experts trading useful knowledge without the overhead of traditional learning platforms.</div></div><blockquote><p>“SkillSwap is where focused people find the niche expertise tutorials cannot provide.”</p><cite>Independent product designer</cite></blockquote></section>
-    <section className="auth-form-side"><div className="auth-form-premium"><header><p>{isLogin ? 'Welcome back' : 'Get started'}</p><h1>{isLogin ? 'Sign in' : 'Create account'}</h1><span>{isLogin ? 'Continue to your SkillSwap workspace.' : 'Start exchanging what you know.'}</span></header>{children}<p className="auth-switch-new">{isLogin ? 'New to SkillSwap?' : 'Already have an account?'} <Link to={isLogin ? '/register' : '/login'}>{isLogin ? 'Create an account' : 'Sign in'}</Link></p></div></section>
-  </main>;
+
+  return (
+    <main className="foundry-auth-page">
+      <section className="auth-visual-side">
+        <div className="auth-grid-overlay" />
+        <div className="auth-atmosphere-glow" />
+
+        <div className="auth-visual-content">
+          <Link to="/" className="auth-back-home" aria-label="SkillSwap home"><Brand /></Link>
+          <div className="auth-statement">
+            <p className="eyebrow">Expertise Vault</p>
+            <h2>{isLogin ? 'Welcome back to the exchange.' : 'Join the next generation of knowledge.'}</h2>
+            <p className="auth-description">Access a global network of focused professionals trading niche expertise without the overhead.</p>
+          </div>
+          <div className="auth-footer-badge"><span className="secure-dot" />End-to-end encrypted session</div>
+        </div>
+      </section>
+
+      <section className="auth-form-side">
+        <div className="form-container-inner fade-in">
+          <header className="form-header-premium">
+            <h1>{isLogin ? 'Sign In' : 'Create Account'}</h1>
+            <p>{isLogin ? 'Welcome back, Expert.' : 'Start your journey today.'}</p>
+          </header>
+          <div className="clerk-wrapper-foundry">{children}</div>
+          <footer className="auth-form-footer">
+            <p>{isLogin ? 'New to the platform?' : 'Already have an account?'}{' '}<Link to={isLogin ? '/register' : '/login'}>{isLogin ? 'Register here' : 'Log in'}</Link></p>
+          </footer>
+        </div>
+      </section>
+    </main>
+  );
 }
 
 export default AuthLayout;

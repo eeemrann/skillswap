@@ -23,50 +23,73 @@ export default function UserProfile() {
     Promise.all([api.get(`/users/${id}`), api.get(`/reviews/${id}`)])
       .then(([profileResult, reviewResult]) => {
         if (!active) return;
-        setProfile(profileResult.data);
+        const loadedProfile = profileResult.data;
+        setProfile(loadedProfile);
+        setSelectedSkill(loadedProfile.skillsOffered?.[0] || '');
         setReviews(reviewResult.data.reviews || []);
         setReviewSummary(reviewResult.data);
       })
-      .catch((err) => active && setError(err.response?.data?.message || 'This expert profile could not be loaded.'))
+      .catch((requestError) => active && setError(requestError.response?.data?.message || 'This expert profile could not be loaded.'))
       .finally(() => active && setLoading(false));
     return () => { active = false; };
   }, [id]);
 
-  const requestSession = async (event) => {
+  const handleBooking = async (event) => {
     event.preventDefault();
-    setSending(true); setError(''); setMessage('');
+    setSending(true);
+    setError('');
+    setMessage('');
     try {
       await api.post('/bookings', { providerId: id, skill: selectedSkill, proposedTime: new Date(proposedTime).toISOString(), durationMinutes: 60 }, { headers: { 'Idempotency-Key': crypto.randomUUID() } });
-      setMessage(`Your ${selectedSkill} request has been sent.`);
+      setMessage(`Your ${selectedSkill} request has been sent successfully.`);
       setProposedTime('');
-    } catch (err) { setError(err.response?.data?.message || 'Your session request could not be sent.'); }
-    finally { setSending(false); }
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || 'Your session request could not be sent.');
+    } finally { setSending(false); }
   };
 
-  if (loading) return <AppShell eyebrow="Community expert" title="Loading profile…"><div className="expert-profile-loading"/></AppShell>;
-  if (!profile) return <AppShell eyebrow="Community expert" title="Profile unavailable"><div className="bento-empty"><strong>We couldn’t find this expert.</strong><span>{error}</span><Link className="secondary-button" to="/browse">Back to Discover</Link></div></AppShell>;
+  if (loading) return <AppShell eyebrow="Expert Portfolio" title="Calibrating profile…"><div className="expert-profile-loading" /></AppShell>;
+  if (!profile) return <AppShell eyebrow="Expert Portfolio" title="Profile unavailable"><div className="glass-directory-empty"><strong>We couldn’t find this expert.</strong><span>{error}</span><Link className="secondary-button" to="/browse">Back to Discover</Link></div></AppShell>;
 
-  const firstName = profile.name.split(' ')[0];
   const location = profile.location?.city ? `${profile.location.city}${profile.location.country ? `, ${profile.location.country}` : ''}` : 'Global member';
+  const offeredSkills = profile.skillsOffered || [];
+  const wantedSkills = profile.skillsWanted || [];
 
   return (
-    <AppShell eyebrow="Community expert" title={profile.name} description={`${location} · ${reviewSummary.totalReviews || 0} verified reviews`}>
-      <div className="expert-profile-header page-enter"><span className="expert-profile-avatar">{initials(profile.name)}</span><div><span className="expert-availability"><i/> Available for exchanges</span><p>{profile.bio || 'This expert prefers to let their skills and community exchanges speak for themselves.'}</p></div><div className="expert-proof"><strong>{reviewSummary.averageRating || 'New'}</strong><span>{reviewSummary.averageRating ? 'average rating' : 'community expert'}</span></div></div>
+    <AppShell eyebrow="Expert Portfolio" title={profile.name} description={`${location} · ${reviewSummary.totalReviews || 0} verified reviews`}>
+      <div className="expert-profile-layout prestige-profile page-enter">
+        <main className="expert-profile-main">
+          <section className="glass-card prestige-profile-hero">
+            <div className="expert-profile-avatar">{initials(profile.name)}</div>
+            <div><div className="expert-availability"><i /> Active Mentor</div><p>{profile.bio || 'This expert focuses on delivering high-impact knowledge transfers.'}</p></div>
+            <div className="prestige-rating"><strong>{reviewSummary.averageRating || 'New'}</strong><span>{reviewSummary.averageRating ? 'average rating' : 'community expert'}</span></div>
+          </section>
 
-      {message && <p className="status-message">{message}</p>}
-      {error && <p className="status-message error">{error}</p>}
-
-      <div className="expert-profile-layout">
-        <main className="expert-profile-main page-enter">
-          <section className="expert-profile-section"><div className="section-eyebrow">Professional bio</div><p className="professional-bio">{profile.bio || 'This expert prefers to let their skills and community exchanges speak for themselves.'}</p></section>
-          <div className="expert-skill-columns">
-            <section><div className="section-eyebrow">Can teach</div><div className="skill-pill-group">{profile.skillsOffered?.length ? profile.skillsOffered.map((skill) => <button type="button" className={`skill-pill-large ${selectedSkill === skill ? 'selected' : ''}`} key={skill} onClick={() => setSelectedSkill(skill)}>{skill}</button>) : <span className="form-hint">No expertise listed yet.</span>}</div></section>
-            <section><div className="section-eyebrow">Wants to learn</div><div className="skill-pill-group">{profile.skillsWanted?.length ? profile.skillsWanted.map((skill) => <span className="skill-pill-large wanted" key={skill}>{skill}</span>) : <span className="form-hint">Open to new ideas.</span>}</div></section>
+          <div className="prestige-skill-grid">
+            <section className="glass-card"><span className="section-eyebrow">Can Teach</span><div className="skill-pill-group">{offeredSkills.length ? offeredSkills.map((skill) => <span key={skill} className="skill-pill-large">{skill}</span>) : <span className="form-hint">No expertise listed yet.</span>}</div></section>
+            <section className="glass-card"><span className="section-eyebrow">Learning</span><div className="skill-pill-group">{wantedSkills.length ? wantedSkills.map((skill) => <span key={skill} className="skill-pill-large wanted">{skill}</span>) : <span className="form-hint">Open to new ideas.</span>}</div></section>
           </div>
-          <section className="expert-profile-section review-section"><div className="section-eyebrow">Endorsements & reviews</div>{reviews.length === 0 ? <div className="profile-review-empty"><Icon name="message" size={20}/><span>No reviews yet for this member.</span></div> : <div className="profile-review-list">{reviews.map((review) => <article className="profile-review" key={review._id}><header><span><strong>{review.reviewer?.name || 'SkillSwap member'}</strong><small>{new Date(review.createdAt).toLocaleDateString()}</small></span><span className="review-stars" aria-label={`${review.rating} out of 5 stars`}>{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</span></header>{review.comment && <p>{review.comment}</p>}</article>)}</div>}</section>
+
+          <section className="prestige-reviews">
+            <span className="section-eyebrow">Endorsements</span>
+            {reviews.length === 0 ? <div className="profile-review-empty"><Icon name="message" size={20} /> No community reviews yet.</div> : <div className="profile-review-list">{reviews.map((review) => <article key={review._id} className="glass-card prestige-review"><header><span><strong>{review.reviewer?.name || 'SkillSwap member'}</strong><small>{review.createdAt ? new Date(review.createdAt).toLocaleDateString() : 'Verified exchange'}</small></span><span className="review-stars" aria-label={`${review.rating} out of 5 stars`}>{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</span></header>{review.comment && <p>{review.comment}</p>}</article>)}</div>}
+          </section>
         </main>
 
-        <aside className="expert-booking-aside"><form className="expert-booking-card" onSubmit={requestSession}><span className="booking-card-icon"><Icon name="calendar" size={18}/></span><h2>Book a session</h2><p>Select a skill and request a one-hour exchange with {firstName}.</p><div className="profile-skill-options">{profile.skillsOffered?.map((skill) => <button type="button" className={selectedSkill === skill ? 'active' : ''} key={skill} onClick={() => setSelectedSkill(skill)}><span>{skill}</span><Icon name="arrow" size={14}/></button>)}</div><div className="form-field"><label htmlFor="profile-time">Proposed date and time</label><input id="profile-time" type="datetime-local" value={proposedTime} onChange={(event) => setProposedTime(event.target.value)} required/></div><button className="primary-button" type="submit" disabled={!selectedSkill || sending}>{sending ? 'Sending request…' : selectedSkill ? `Request ${selectedSkill}` : 'Select a skill'}</button><div className="booking-cost"><span>Session cost</span><strong>1 time credit</strong></div></form></aside>
+        <aside className="expert-booking-aside">
+          <form onSubmit={handleBooking} className="glass-card expert-booking-card prestige-booking-card">
+            <div className="booking-card-icon"><Icon name="calendar" size={20} /></div>
+            <h2>Secure a Session</h2>
+            <p>Request a one-hour exchange. One credit transfers only after completion.</p>
+
+            <div className="input-group-premium"><label>Select Expertise</label><div className="prestige-skill-options">{offeredSkills.map((skill) => <button type="button" key={skill} className={`skill-pill-large ${selectedSkill === skill ? 'selected' : ''}`} onClick={() => setSelectedSkill(skill)}>{skill}</button>)}</div>{offeredSkills.length === 0 && <span className="form-hint">This expert has not listed a bookable skill yet.</span>}</div>
+            <div className="input-group-premium"><label htmlFor="profile-time">Proposed Time</label><input id="profile-time" type="datetime-local" className="prestige-time-input" value={proposedTime} onChange={(event) => setProposedTime(event.target.value)} required /></div>
+            <button type="submit" className="primary-button" disabled={!selectedSkill || sending}>{sending ? 'Processing…' : 'Send Request'}</button>
+            {message && <p className="prestige-form-message success" role="status">{message}</p>}
+            {error && <p className="prestige-form-message error" role="alert">{error}</p>}
+            <div className="booking-cost"><span>Transaction Amount</span><strong>1.0 Credit</strong></div>
+          </form>
+        </aside>
       </div>
     </AppShell>
   );

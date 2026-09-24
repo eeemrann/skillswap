@@ -142,7 +142,6 @@ exports.getAllUsers = async (req, res) => {
       && lng >= -180 && lng <= 180 && lat >= -90 && lat <= 90;
     if (!hasValidQueryCoordinates) return res.set('X-Location-Fallback', 'true').status(200).json(await fallback());
     if (radiusKm === 'worldwide') return res.status(200).json(await fallback());
-    console.log('Querying near:', [lng, lat], 'Requester ID:', req.userId);
     const maxDistanceMeters = radiusKm * 1000;
     const users = await User.aggregate([
       { $geoNear: {
@@ -179,9 +178,7 @@ exports.getAllUsers = async (req, res) => {
       { $skip: (page - 1) * limit },
       { $limit: limit }
     ]);
-    console.log('Found nearby users count:', users.length);
     if (users.length === 0) {
-      console.log(`GeoNear returned 0 within ${radiusKm}km.`);
       return res.status(200).json(users);
     }
     return res.status(200).json(users);
