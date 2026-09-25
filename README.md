@@ -1,4 +1,4 @@
-# SkillSwap
+# SkillSwap.
 
 SkillSwap is a peer-to-peer skill-exchange platform. Members maintain skills they can teach and skills they want to learn, discover nearby members, request exchanges, message booking partners, transfer time credits when an exchange is completed, and leave reviews.
 
