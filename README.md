@@ -1,156 +1,225 @@
+<div align="center">
+
+<img src="client/public/favicon.svg" width="72" alt="SkillSwap logo" />
+
 # SkillSwap
 
-SkillSwap is a SaaS marketplace for **live one-to-one video lessons paid in time**. Members teach what they know, learn what they want, and settle up in credits: **1 credit = 1 hour of video time**. Sessions happen inside the app on a built-in WebRTC video room (camera, microphone, screen sharing and chat), so there is nothing to install and no meeting links to juggle.
+**A SaaS marketplace for live one-to-one video lessons, paid in time.**<br/>
+Teach for an hour, earn a credit, spend it learning something new.
 
-Location is optional and only used to rank nearby teachers. **Every session is online.**
+![React](https://img.shields.io/badge/React_19-20232a?logo=react&logoColor=61dafb)
+![Vite](https://img.shields.io/badge/Vite-646cff?logo=vite&logoColor=white)
+![Node](https://img.shields.io/badge/Node.js_20-339933?logo=nodedotjs&logoColor=white)
+![Express](https://img.shields.io/badge/Express_5-000000?logo=express&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-47A248?logo=mongodb&logoColor=white)
+![WebRTC](https://img.shields.io/badge/WebRTC-333333?logo=webrtc&logoColor=white)
+![Socket.IO](https://img.shields.io/badge/Socket.IO-010101?logo=socketdotio&logoColor=white)
+![Stripe](https://img.shields.io/badge/Stripe-635bff?logo=stripe&logoColor=white)
+![Python](https://img.shields.io/badge/Python_Flask-3776ab?logo=python&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ed?logo=docker&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-153_passing-2ea44f)
 
-## What's in the product
+<br/>
 
-| Area | Highlights |
+<img src="docs/screenshots/session-call.png" alt="A live SkillSwap video session with screen sharing controls, timer and chat" width="880" />
+
+</div>
+
+## The product
+
+People trade skills instead of money. A designer teaches Figma and earns credits; those credits buy an hour of Spanish from someone else. **1 credit = 1 hour**, and every session happens in a **built-in video room** in the browser, with no downloads and no meeting links.
+
+It is built as a real business, not a demo: subscriptions, credit packs, a service fee, escrow so nobody pays for a session that did not happen, an admin console with revenue metrics, and the privacy and account controls a paying product needs.
+
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/landing.png" alt="Landing page" /><br/><sub><b>Landing</b> · marketing site with live pricing</sub></td>
+    <td width="50%"><img src="docs/screenshots/dashboard.png" alt="Member dashboard" /><br/><sub><b>Dashboard</b> · next session, matches, wallet</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/session-lobby.png" alt="Pre-join lobby" /><br/><sub><b>Pre-join lobby</b> · camera preview, device pickers</sub></td>
+    <td><img src="docs/screenshots/discover.png" alt="Discover teachers" /><br/><sub><b>Discover</b> · server-side search, Pro placement</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/teacher-profile.png" alt="Teacher profile and booking form" /><br/><sub><b>Booking</b> · cost, plan limits, teacher's local time</sub></td>
+    <td><img src="docs/screenshots/billing.png" alt="Wallet, plans and credit history" /><br/><sub><b>Wallet & plan</b> · Stripe checkout, ledger, receipts</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/admin.png" alt="Admin dashboard" /><br/><sub><b>Admin</b> · MRR, revenue, member management</sub></td>
+    <td><img src="docs/screenshots/dashboard-dark.png" alt="Dark theme" /><br/><sub><b>Dark theme</b> · and fully responsive (below)</sub></td>
+  </tr>
+</table>
+
+<div align="center"><img src="docs/screenshots/mobile-dashboard.png" alt="Mobile layout" width="260" /></div>
+
+## Feature overview
+
+| | |
 | --- | --- |
-| **Live video sessions** | Peer-to-peer HD video/audio, screen share, in-call chat (saved to the conversation), session timer, connection-quality indicator, device switching, pre-join lobby with camera preview, automatic reconnection, TURN fallback |
-| **Credits & escrow** | Credits are reserved from the learner when the teacher confirms and released after the session. No-shows are refunded automatically; sessions both members attended settle on their own after 24 h |
-| **Monetization** | Free / Pro subscription (monthly or yearly), credit packs, 10 % service fee on credits earned by Free-plan teachers, in-context paywall, Stripe Checkout + customer portal |
-| **Discovery & matching** | Server-side search, optional radius filter, Pro placement, mutual-swap bonus, timezone-aware availability overlap, verified reviews |
-| **Booking flow** | Request → confirm → join → confirm & pay → review; cancellations, expiries, reminders by email and in-app, idempotent requests |
-| **Admin** | MRR, revenue, growth and session metrics, member search, suspend/restore, support credits with audit trail, payments list |
-| **Trust & privacy** | Only verified emails receive a profile; exact coordinates are never exposed; data export and account deletion; rate limiting; webhook signature verification |
+| **Live video** | Peer-to-peer HD video and audio, screen sharing, in-call chat, session timer, connection-quality indicator, device switching, automatic reconnection, TURN relay fallback |
+| **Credits & escrow** | Credits are reserved when a teacher confirms and released after the session. No-shows refund automatically; sessions both people attended settle on their own after 24 h |
+| **Monetization** | Free and Pro plans (monthly or yearly), credit packs, a service fee on Free-plan earnings, an in-context paywall, Stripe Checkout and the customer portal |
+| **Matching** | Skill fit, a bonus for true two-way swaps, **timezone-aware** availability overlap, optional distance filter |
+| **Bookings** | Request, confirm, join, confirm and pay, review. Cancellations, expiry, email and in-app reminders, idempotent requests |
+| **Trust & privacy** | Verified-email sign-up, exact location never exposed, data export, account deletion, rate limiting, signed webhooks |
+| **Admin** | MRR and revenue, growth, member search, suspend and restore, support credits with an audit trail |
 
-## Pricing model (configurable in `server/config/plans.js`)
+## Engineering highlights
 
-| | Free | Pro |
-| --- | --- | --- |
-| Price | $0 | $12 / month or $119 / year |
-| Starter credits | 3 on sign-up | + 4 credits per month (48 up front on yearly) |
-| Service fee on credits you earn | 10 % | 0 % |
-| Active bookings | 3 | 25 |
-| Session length | up to 60 min | up to 4 h |
-| Discover placement | standard | priority + Pro badge |
+These are the parts I would want to talk through in an interview.
 
-Credit packs: 3 for $9, 10 for $25, 25 for $55. Credits never expire and cannot be cashed out, which keeps SkillSwap a time-exchange rather than a payments product. Prices, fees and limits live in one file and flow to the API, checkout and marketing pages.
+### 1. A WebRTC engine that survives glare, reloads and bad networks
+The video layer is a framework-independent controller (`client/src/lib/call.js`) that React reads through `useSyncExternalStore`. It uses the *perfect negotiation* pattern, ICE restarts, a connection watchdog and live stats sampling.
 
-Revenue streams: subscriptions, credit-pack sales and the Free-plan service fee. Pro upsells appear at the moments they matter: an empty wallet, a plan limit, or a longer session.
+Testing it properly mattered. A single happy-path run passed, but a **stress test (simultaneous joins and mid-call reloads, in two real Chromium browsers)** exposed that it connected only **2 of 6** times and recovered from a reload **0 of 6** times. Tracing `RTCPeerConnection` showed the polite peer rolling back its own offer and then producing no usable ICE candidates. The fix was to design glare out of the common path: the member already in the room always makes the offer, and the joiner answers first and attaches media afterwards. Result: **16 of 16** rounds.
+
+### 2. Money that cannot be double-spent
+Credits are decimal hours, so balances are kept exact to two places and every movement is a MongoDB **multi-document transaction**:
+- Accepting a booking *reserves* credits; the spendable balance is `balance − held`, so a learner cannot over-commit across several sessions.
+- Settlement debits, credits (minus the plan fee), writes the ledger entry and releases the reservation atomically. A **unique index** guarantees one settlement per booking. A test fires three concurrent confirmations and asserts exactly one succeeds.
+- A background worker closes anything nobody finished, and never leaves credits stranded in escrow.
+
+### 3. Idempotent payments
+Stripe webhooks are signature-verified over the raw body. Fulfilment inserts a `Payment` with a unique external id **in the same transaction** as the credit grant, so a redelivered or concurrent event can never grant credits twice. Subscriptions mirror Stripe state (`active`, `past_due`, cancelled) and Pro stays on during payment retries.
+
+### 4. Real-time without a message broker
+One authenticated Socket.IO connection carries WebRTC signalling and instant notification and message pushes. The server enforces *who* may be in *which* room and *when*, handles second tabs, records per-person attendance (used for fair settlement), and issues short-lived TURN credentials (HMAC, coturn REST scheme).
+
+### 5. Privacy by design
+Public profiles and the directory expose only a city, never coordinates. Booking payloads never include other members' emails or the room secret. Location is opt-in. Search input is regex-escaped; every endpoint is validated. A real bug fixed along the way: the original geo index crashed any profile that had a city but no coordinates, so it became a *partial* 2dsphere index.
+
+### 6. Timezone-correct matching
+Availability slots are converted to UTC minutes-of-the-week using each member's timezone (DST-aware) and compared as intervals, including slots that wrap the week boundary. The Python matching service and its JavaScript fallback implement the same scoring, and each is covered by tests for the same cases.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    browser["Browser: React SPA"]
-    clerk["Clerk: identity"]
-    stripe["Stripe: payments"]
-    subgraph node["Node API process"]
-        api["Express REST API"]
-        sockets["Socket.IO: signalling + push"]
-        workers["Workers: email queue, reminders, auto-settlement"]
+    browser["Browser · React SPA"]
+    clerk["Clerk · identity"]
+    stripe["Stripe · payments"]
+    subgraph node["Node API"]
+        api["Express REST"]
+        sockets["Socket.IO · signalling + push"]
+        workers["Workers · email, reminders, auto-settle"]
     end
     mongo[("MongoDB replica set")]
-    matcher["Python matching service"]
-    notifier["Python notification service"]
-    resend["Resend email"]
-    turn["coturn (optional TURN relay)"]
+    matcher["Matching service · Flask"]
+    notifier["Notification service · Flask"]
+    resend["Resend"]
+    turn["coturn · optional relay"]
 
-    browser <-->|Bearer token| api
+    browser <-->|REST + Bearer token| api
     browser <-->|WebSocket| sockets
-    browser <-->|"media (P2P, DTLS-SRTP)"| browser
-    browser -.->|relay when P2P fails| turn
+    browser <-->|"media · P2P, encrypted"| browser
+    browser -.->|relay if P2P fails| turn
     browser <--> clerk
     api <--> mongo
     api --> matcher
     workers --> notifier --> resend
-    api -->|Checkout / Portal| stripe
-    stripe -->|signed webhooks| api
+    api <-->|Checkout, signed webhooks| stripe
 ```
-
-* **Only the Node API talks to MongoDB.** A replica set is required because booking acceptance, settlement and payment fulfilment are multi-document transactions.
-* **Video is peer-to-peer.** The server only relays WebRTC signalling and enforces who may be in which room and when; it never sees media. The room opens 10 minutes before the start and closes 15 minutes after the scheduled end. The offerer is always the member already in the room, so simultaneous offers are avoided, and "perfect negotiation" is kept as a safety net.
-* **Realtime** uses a single authenticated Socket.IO connection for signalling and instant notification/message pushes. HTTP polling remains as a slow fallback.
-* **Matching** runs in the Python service; the API falls back to an identical JavaScript implementation if it is unavailable.
-* A single API instance holds room state in memory. To scale horizontally, add the Socket.IO Redis adapter and sticky sessions.
-
-## Credits, escrow and settlement
 
 ```mermaid
 stateDiagram-v2
-    [*] --> pending: Learner requests (cost checked)
+    [*] --> pending: Learner requests
     pending --> accepted: Teacher confirms (credits reserved)
     pending --> declined
     pending --> cancelled
-    pending --> expired: Start time passed
+    pending --> expired
     accepted --> completed: Learner confirms, or auto after 24 h if both attended
-    accepted --> cancelled: Either member (reservation released)
-    accepted --> expired: Nobody/one showed up (reservation released)
+    accepted --> cancelled: Reservation released
+    accepted --> expired: Nobody showed up, reservation released
 ```
 
-* Spendable credits = balance − credits reserved for confirmed sessions, so a learner cannot over-commit.
-* Settlement moves the credits to the teacher minus the plan fee, writes one ledger entry (a unique index guarantees a booking settles once) and releases the reservation, all in one transaction.
-* Stripe webhooks are idempotent: the `Payment` document's unique `externalId` is inserted in the same transaction as the credit grant, so redelivered events can never double-credit.
+## Testing
 
-## Local development
+**153 automated tests** across the stack, run in CI on every push.
 
-Requirements: Node 20+, Python 3.11+, MongoDB 7 **as a replica set**, a [Clerk](https://clerk.com) application, optionally Stripe and Resend.
+| Suite | Tests | What it proves |
+| --- | --- | --- |
+| Booking lifecycle (integration) | 20 | Escrow, concurrent settlement, plan limits, auto-closing, cancellations, all against real MongoDB transactions |
+| Stripe webhooks (integration) | 11 | Signature checks, replay safety, yearly and monthly Pro grants, downgrade, `past_due` |
+| Realtime sockets (integration) | 10 | Auth, access windows, signalling relay, persisted chat, attendance, tab replacement |
+| HTTP API (integration) | 22 | Directory and geo search, privacy of public data, bookings and ledger, messaging, account deletion, admin |
+| Unit | 65 | Session windows, ICE credentials, pricing and fees, availability math, validation, auth middleware |
+| Python services | 25 | Matching, timezone handling, email templating and HTML escaping |
+
+Integration suites run on an in-memory MongoDB replica set, so they need no external services. The UI and the video engine were also exercised end to end in headless Chromium with two simultaneous participants.
+
+## Tech stack
+
+| Layer | Technology |
+| --- | --- |
+| Frontend | React 19, React Router 7, Redux Toolkit, Vite 8, hand-written design system (light and dark), Socket.IO client, native WebRTC |
+| API | Node.js 20, Express 5, Mongoose 8, Socket.IO, `express-rate-limit`, Helmet |
+| Data | MongoDB 7 (replica set, transactions, partial 2dsphere and unique indexes, TTL indexes) |
+| Auth | Clerk (JWT verified on REST and on the socket handshake) |
+| Payments | Stripe Checkout, Billing Portal, webhooks |
+| Services | Python 3.11 + Flask: matching and templated HTML email via Resend |
+| Infra | Docker Compose, nginx, coturn, GitHub Actions CI |
+
+## Business model
+
+| | Free | Pro |
+| --- | --- | --- |
+| Price | $0 | $12 / month or $119 / year |
+| Welcome credits | 3 | plus 4 credits every month |
+| Service fee on credits earned | 10 % | 0 % |
+| Active bookings | 3 | 25 |
+| Session length | up to 60 min | up to 4 h |
+| Placement in Discover | standard | priority and Pro badge |
+
+Credit packs (3 / 10 / 25 credits for $9 / $25 / $55) cover members who would rather pay than teach. Every price, fee and limit lives in one file, `server/config/plans.js`.
+
+## Repository layout
+
+```
+client/                  React SPA
+  src/lib/call.js        WebRTC engine (negotiation, reconnection, screen share, stats)
+  src/pages/Session.jsx  Lobby, call UI, post-call confirmation
+  src/styles/            Design tokens, light/dark themes, responsive layout
+server/                  Express API, Socket.IO, background workers
+  config/plans.js        Pricing, fees and plan limits
+  services/              bookingService (escrow), billingService (Stripe), sessionService, workers
+  sockets/               Authenticated signalling and push
+  tests/                 Unit and integration suites
+matching-service/        Flask: skill, mutual-swap and timezone-aware ranking
+notification-service/    Flask: HTML and text email templates
+infra/                   coturn configuration
+```
+
+<details>
+<summary><b>Run it locally</b></summary>
+
+<br/>
+
+Requires Node 20+, Python 3.11+, MongoDB 7 as a replica set, and a Clerk application. Stripe, Resend and TURN are optional in development.
 
 ```bash
 # API
-cd server && cp .env.example .env   # fill in MONGO_URI, Clerk keys, ...
-npm install && npm run dev
-
+cd server && cp .env.example .env && npm install && npm run dev
 # Web app
-cd client && cp .env.example .env   # VITE_CLERK_PUBLISHABLE_KEY, VITE_API_URL
-npm install && npm run dev
-
-# Python services (optional locally)
-cd matching-service && pip install -r requirements.txt && python app.py
-cd notification-service && pip install -r requirements.txt && python app.py
+cd client && cp .env.example .env && npm install && npm run dev
 ```
 
-Or run everything: `docker compose up --build` (add `--profile turn` for the TURN relay). Make yourself an admin with `node server/scripts/makeAdmin.js you@example.com`.
-
-### Clerk
-Create an application, enable the sign-in methods you want, and set `CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY` on the API and `VITE_CLERK_PUBLISHABLE_KEY` on the client. Require email verification: the API only creates profiles (and grants welcome credits) for verified addresses.
-
-### Stripe
-1. Set `STRIPE_SECRET_KEY`. Products and prices are created inline at checkout, so no dashboard setup is needed.
-2. Add a webhook endpoint `https://<api>/api/billing/webhook` for `checkout.session.completed`, `invoice.paid`, `invoice.payment_failed` and `customer.subscription.created|updated|deleted`, and set `STRIPE_WEBHOOK_SECRET`.
-3. Enable the customer portal in the Stripe dashboard so members can manage cards and cancel.
-4. Optional: enable Stripe Tax and set `STRIPE_AUTOMATIC_TAX=true`.
-
-Test locally with `stripe listen --forward-to localhost:5000/api/billing/webhook`.
-
-### TURN (important for production video)
-STUN is enough for most connections, but some corporate and mobile networks need a relay. Run coturn (`docker compose --profile turn up`, or any hosted TURN service), then set `TURN_URLS` and either `TURN_SECRET` (short-lived credentials are generated per member) or `TURN_USERNAME` / `TURN_CREDENTIAL`.
-
-## Tests
+Or run everything with `docker compose up --build` (add `--profile turn` for the TURN relay). All configuration is documented in `server/.env.example`.
 
 ```bash
-cd server && npm test            # 128 tests: unit + integration (real MongoDB transactions, real sockets, signed Stripe webhooks)
+cd server && npm test                      # 128 tests
 cd client && npm run lint && npm run build
-cd matching-service && python -m unittest -v
-cd notification-service && python -m unittest -v
+cd matching-service && python -m unittest
+cd notification-service && python -m unittest
 ```
 
-The integration suites use `mongodb-memory-server` replica sets, so no external database is needed. They cover escrow and settlement races, plan limits, webhook idempotency, socket authorization and signalling, privacy of public profiles, and account deletion.
+</details>
 
-## Before you launch
+---
 
-- [ ] Have a lawyer review `client/src/pages/Legal.jsx` (Terms and Privacy are plain-language templates, including the refund wording) and add a real support contact.
-- [ ] Set production values for every variable in `server/.env.example`; use live Clerk and Stripe keys.
-- [ ] Deploy TURN and set `TURN_*`; test a session across two different networks.
-- [ ] Create the Stripe webhook and test a purchase, a renewal and a cancellation end to end.
-- [ ] Verify your sending domain with Resend and set `EMAIL_FROM`.
-- [ ] Run behind HTTPS (required for camera access outside localhost).
-- [ ] Add error monitoring (e.g. Sentry) and uptime checks on `/health`.
-- [ ] Decide your policy on refunds, disputes and reported members; the admin tools support suspension and support credits.
+<div align="center">
 
-## Project layout
+Built by [@eeemrann](https://github.com/eeemrann)
 
-```
-client/              React 19 + Vite SPA (pages, components, lib/call.js = WebRTC engine)
-server/              Express API, Socket.IO, workers
-  config/plans.js    Pricing, fees, limits
-  services/          bookingService (escrow lifecycle), billingService (Stripe), sessionService, workers
-  sockets/           Authenticated signalling + push
-  tests/             Unit + integration suites
-matching-service/    Flask: ranking (skills, mutual swap, timezone-aware availability)
-notification-service/ Flask: HTML/text emails through Resend
-infra/               coturn configuration
-```
+</div>
