@@ -1,15 +1,15 @@
 const mongoose = require('mongoose');
 
 const notificationSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   type: {
     type: String,
-    enum: ['booking', 'message', 'review', 'credit'],
+    enum: ['booking', 'message', 'review', 'credit', 'session', 'billing'],
     required: true
   },
   message: { type: String, required: true, maxlength: 500, trim: true },
   relatedId: { type: mongoose.Schema.Types.ObjectId, required: true },
-  read: { type: Boolean, default: false, index: true }
+  read: { type: Boolean, default: false }
 }, { timestamps: true });
 
 notificationSchema.index({ userId: 1, read: 1, createdAt: -1 });

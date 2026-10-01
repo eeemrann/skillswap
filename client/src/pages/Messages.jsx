@@ -1,92 +1,115 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useSearchParams } from 'react-router-dom';
-import AppShell from '../components/AppShell';
-import Icon from '../components/Icon';
+import { Link, useSearchParams } from 'react-router-dom';
 import api from '../api/axios';
+import AppShell from '../components/AppShell';
+import Avatar from '../components/Avatar';
+import EmptyState from '../components/EmptyState';
+import Icon from '../components/Icon';
+import { errorMessage, formatRelative, formatTime, idOf } from '../lib/format';
+import { useQuery, useWindowEvent } from '../lib/hooks';
 import { fetchUnreadCounts } from '../redux/notificationSlice';
 
-const initials = (name = '') => name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase();
-const entityId = (entity) => typeof entity === 'string' ? entity : entity?._id;
-
-function Messages() {
-  const currentUser = useSelector((state) => state.auth.user);
+function Thread({ partner, myId, onBack }) {
   const dispatch = useDispatch();
-  const [searchParams] = useSearchParams();
-  const [connections, setConnections] = useState([]);
-  const [userId, setUserId] = useState(() => searchParams.get('with') || '');
-  const [loadingConnections, setLoadingConnections] = useState(true);
-  const [loadingMessages, setLoadingMessages] = useState(false);
-  const [messages, setMessages] = useState([]);
   const [body, setBody] = useState('');
   const [error, setError] = useState('');
+  const [sending, setSending] = useState(false);
   const scrollRef = useRef(null);
 
-  const loadMessages = useCallback(async (targetId, silent = false, isActive = () => true) => {
-    if (!targetId) return;
-    try {
-      if (!silent) setLoadingMessages(true);
-      const { data } = await api.get(`/messages/${targetId}`);
-      if (isActive()) { setMessages(data); setError(''); dispatch(fetchUnreadCounts()); }
-    } catch (err) { if (isActive()) setError(err.response?.data?.message || 'Could not load this conversation.'); }
-    finally { if (!silent && isActive()) setLoadingMessages(false); }
-  }, [dispatch]);
+  const thread = useQuery(async () => {
+    const { data } = await api.get(`/messages/${partner._id}`);
+    dispatch(fetchUnreadCounts());
+    return data;
+  }, [partner._id], { interval: 20000 });
+  useWindowEvent('skillswap:message', () => thread.reload());
 
-  useEffect(() => {
-    let active = true;
-    api.get('/bookings').then(({ data }) => {
-      if (!active) return;
-      const ownId = currentUser?._id || currentUser?.id;
-      const connected = new Map();
-      data.filter((booking) => ['accepted', 'completed'].includes(booking.status)).forEach((booking) => {
-        const providerId = entityId(booking.provider);
-        const requesterId = entityId(booking.requester);
-        const other = providerId === ownId ? booking.requester : requesterId === ownId ? booking.provider : null;
-        if (entityId(other)) connected.set(entityId(other), { id: entityId(other), name: other.name || 'Member' });
-      });
-      const list = [...connected.values()];
-      setConnections(list);
-      setUserId((current) => list.some((item) => item.id === current) ? current : list[0]?.id || '');
-    }).catch((err) => active && setError(err.response?.data?.message || 'Could not load your exchange partners.'))
-      .finally(() => active && setLoadingConnections(false));
-    return () => { active = false; };
-  }, [currentUser?._id, currentUser?.id]);
+  const messages = thread.data || [];
+  useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }); }, [messages.length, partner._id]);
 
-  useEffect(() => {
-    if (!userId) return undefined;
-    let active = true;
-    queueMicrotask(() => active && loadMessages(userId, false, () => active));
-    const refresh = () => { if (!document.hidden && active) loadMessages(userId, true, () => active); };
-    const timer = window.setInterval(refresh, 5000);
-    window.addEventListener('focus', refresh);
-    return () => { active = false; window.clearInterval(timer); window.removeEventListener('focus', refresh); };
-  }, [loadMessages, userId]);
-
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages]);
-
-  const sendMessage = async (event) => {
+  const send = async (event) => {
     event.preventDefault();
-    const cleanBody = body.trim();
-    if (!cleanBody || !userId) return;
+    const text = body.trim();
+    if (!text) return;
+    setSending(true);
+    setError('');
     try {
-      await api.post(`/messages/${userId}`, { body: cleanBody });
-      setBody(''); setError('');
-      await loadMessages(userId, true);
-    } catch (err) { setError(err.response?.data?.message || 'Message could not be sent.'); }
+      const { data } = await api.post(`/messages/${partner._id}`, { body: text });
+      setBody('');
+      thread.setData((current) => [...(current || []), data]);
+    } catch (err) {
+      setError(errorMessage(err, 'Message could not be sent.'));
+    } finally {
+      setSending(false);
+    }
   };
 
-  const activeConnection = connections.find((connection) => connection.id === userId);
-  const ownId = currentUser?._id || currentUser?.id;
-
-  return <AppShell eyebrow="Messenger" title="Direct exchange" description="Focused conversations with the people in your learning network.">
-    {error && <p className="status-message error" role="alert">{error}</p>}
-    <div className="communication-hub">
-      <aside className="conversation-rail"><header><span>Conversations</span><small>{connections.length}</small></header><div className="conversation-rail-list">{loadingConnections && <div className="conversation-loading">Loading partners…</div>}{!loadingConnections && connections.length === 0 && <div className="conversation-empty"><Icon name="message" size={20}/><strong>No conversations yet</strong><span>Accept a booking to begin messaging.</span></div>}{connections.map((connection) => <button type="button" className={userId === connection.id ? 'active' : ''} key={connection.id} onClick={() => { setMessages([]); setUserId(connection.id); }}><span className="conversation-avatar">{initials(connection.name)}</span><span><strong>{connection.name}</strong><small><i/> Active partner</small></span></button>)}</div></aside>
-      <section className="chat-workspace">{!userId ? <div className="chat-placeholder"><Icon name="message" size={24}/><strong>Select a conversation</strong><span>Choose an exchange partner from the sidebar.</span></div> : <><header className="chat-header"><span className="conversation-avatar">{initials(activeConnection?.name)}</span><div><strong>{activeConnection?.name || 'Exchange partner'}</strong><small>Direct conversation</small></div></header><div className="chat-stream" ref={scrollRef} aria-live="polite">{loadingMessages && messages.length === 0 && <div className="chat-loading">Loading conversation…</div>}{!loadingMessages && messages.length === 0 && <div className="chat-placeholder compact"><strong>Start the conversation</strong><span>Share context about your upcoming exchange.</span></div>}{messages.map((message) => { const isMine = entityId(message.sender) === ownId; return <div className={`chat-message ${isMine ? 'mine' : ''}`} key={message._id}><div>{message.body}</div><time>{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></div>; })}</div><form className="command-composer" onSubmit={sendMessage}><label className="sr-only" htmlFor="message-body">Write a message</label><input id="message-body" value={body} onChange={(event) => setBody(event.target.value)} placeholder={`Message ${activeConnection?.name || 'your partner'}…`} maxLength="2000" required/><button className="primary-button" type="submit" disabled={!body.trim()}>Send <Icon name="arrow" size={14}/></button></form></>}</section>
-    </div>
-  </AppShell>;
+  return (
+    <section className="thread card">
+      <header className="thread-head">
+        <button type="button" className="btn btn-ghost btn-icon btn-sm only-mobile" onClick={onBack} aria-label="Back to conversations"><Icon name="arrowLeft" /></button>
+        <Link to={`/profile/${partner._id}`} className="row nowrap" style={{ gap: 12, color: 'inherit' }}>
+          <Avatar name={partner.name} src={partner.profilePicture} />
+          <div className="stack" style={{ '--gap': '0px' }}><strong>{partner.name}</strong><span className="tiny faint">{partner.skill}</span></div>
+        </Link>
+        <div className="grow" />
+        <Link className="btn btn-secondary btn-sm" to="/bookings"><Icon name="video" size={15} /> Sessions</Link>
+      </header>
+      <div className="thread-body" ref={scrollRef} aria-live="polite">
+        {thread.loading && <div className="skeleton" style={{ height: 48, width: '60%' }} />}
+        {!thread.loading && messages.length === 0 && <EmptyState icon="message" title="Say hello">Agree on what to cover and when to meet. Messages are private to the two of you.</EmptyState>}
+        {messages.map((message) => (
+          <div key={message._id} className={`bubble ${message.sender === myId ? 'mine' : ''}`}><p>{message.body}</p><time>{formatTime(message.createdAt)}</time></div>
+        ))}
+      </div>
+      <form className="thread-compose" onSubmit={send}>
+        {error && <span className="tiny negative-text">{error}</span>}
+        <input className="input" value={body} onChange={(event) => setBody(event.target.value)} placeholder={`Message ${partner.name.split(' ')[0]}…`} maxLength={2000} aria-label="Message" />
+        <button type="submit" className="btn btn-primary" disabled={!body.trim() || sending}><Icon name="send" size={16} /><span className="hide-mobile">Send</span></button>
+      </form>
+    </section>
+  );
 }
 
-export default Messages;
+export default function Messages() {
+  const user = useSelector((state) => state.auth.user);
+  const myId = idOf(user);
+  const [params, setParams] = useSearchParams();
+  const requested = params.get('with') || '';
+  const [picked, setPicked] = useState(null);
+
+  const conversations = useQuery(() => api.get('/messages/conversations').then((r) => r.data), [], { interval: 30000 });
+  useWindowEvent('skillswap:message', () => conversations.reload());
+
+  const list = conversations.data || [];
+  const activeId = picked ?? (requested || list[0]?._id || '');
+  const active = list.find((item) => item._id === activeId);
+  const showThread = Boolean(active && (picked !== null || requested));
+
+  const choose = (id) => { setPicked(id); setParams(id ? { with: id } : {}, { replace: true }); };
+
+  return (
+    <AppShell eyebrow="Messages" title="Conversations" description="Chat with members you have a confirmed session with." wide>
+      {conversations.loading ? <div className="skeleton" style={{ height: 420 }} /> : list.length === 0 ? (
+        <div className="card"><EmptyState icon="message" title="No conversations yet" action={<Link className="btn btn-primary" to="/browse">Find a teacher</Link>}>You can message someone once a session between you has been confirmed.</EmptyState></div>
+      ) : (
+        <div className={`messenger ${showThread ? 'show-thread' : ''}`}>
+          <aside className="conversations card" aria-label="Conversations">
+            {list.map((item) => (
+              <button type="button" key={item._id} className={`conversation ${item._id === active?._id ? 'active' : ''}`} onClick={() => choose(item._id)}>
+                <Avatar name={item.name} src={item.profilePicture} />
+                <span className="grow stack" style={{ '--gap': '1px', textAlign: 'left', minWidth: 0 }}>
+                  <span className="row spread nowrap"><strong className="truncate">{item.name}</strong>{item.lastMessage && <span className="tiny faint">{formatRelative(item.lastMessage.createdAt)}</span>}</span>
+                  <span className="small muted truncate">{item.lastMessage ? `${item.lastMessage.sender === myId ? 'You: ' : ''}${item.lastMessage.body}` : item.skill}</span>
+                </span>
+                {item.unread > 0 && <span className="count-badge">{item.unread}</span>}
+              </button>
+            ))}
+          </aside>
+          {active ? <Thread key={active._id} partner={active} myId={myId} onBack={() => { setPicked(''); setParams({}, { replace: true }); }} />
+            : <section className="thread card"><EmptyState icon="message" title="Select a conversation" /></section>}
+        </div>
+      )}
+    </AppShell>
+  );
+}

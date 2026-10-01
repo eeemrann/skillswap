@@ -6,7 +6,11 @@ const { createInAppNotification } = require('../services/notificationService');
 
 exports.createReview = async (req, res) => {
   try {
-    const { bookingId, rating, comment } = req.body;
+    const { bookingId } = req.body;
+    const rating = Number(req.body.rating);
+    const comment = typeof req.body.comment === 'string' ? req.body.comment.trim().slice(0, 1000) : '';
+    if (!mongoose.Types.ObjectId.isValid(bookingId)) return res.status(400).json({ message: 'Invalid booking id' });
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) return res.status(400).json({ message: 'Rating must be a whole number from 1 to 5' });
     const booking = await Booking.findById(bookingId);
     if (!booking) return res.status(404).json({ message: 'Booking not found' });
     if (booking.status !== 'completed') return res.status(400).json({ message: 'Reviews are available after completion' });
@@ -33,31 +37,22 @@ exports.createReview = async (req, res) => {
 };
 
 exports.getUserReviews = async (req, res) => {
-  try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.userId)) {
-      return res.status(400).json({ message: 'Invalid user id' });
-    }
-    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
-    const page = Math.max(Number(req.query.page) || 1, 1);
-    const filter = { reviewee: req.params.userId };
-    const [reviews, summary] = await Promise.all([
-      Review.find(filter).populate('reviewer', 'name profilePicture').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit),
-      Review.aggregate([{ $match: { reviewee: new mongoose.Types.ObjectId(req.params.userId) } }, { $group: { _id: null, totalReviews: { $sum: 1 }, averageRating: { $avg: '$rating' } } }])
-    ]);
-    const totalReviews = summary[0]?.totalReviews || 0;
-    const averageRating = summary[0] ? Number(summary[0].averageRating.toFixed(1)) : 0;
-    res.json({ averageRating, totalReviews, reviews });
-  } catch (err) {
-    console.error('Review list failed:', err.message);
-    res.status(500).json({ message: 'Could not load reviews' });
+  if (!mongoose.Types.ObjectId.isValid(req.params.userId)) {
+    return res.status(400).json({ message: 'Invalid user id' });
   }
+  const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
+  const page = Math.max(Number(req.query.page) || 1, 1);
+  const reviewee = new mongoose.Types.ObjectId(req.params.userId);
+  const [reviews, summary] = await Promise.all([
+    Review.find({ reviewee }).populate('reviewer', 'name profilePicture').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit),
+    Review.aggregate([{ $match: { reviewee } }, { $group: { _id: null, totalReviews: { $sum: 1 }, averageRating: { $avg: '$rating' } } }])
+  ]);
+  const totalReviews = summary[0]?.totalReviews || 0;
+  const averageRating = summary[0] ? Number(summary[0].averageRating.toFixed(1)) : 0;
+  res.json({ averageRating, totalReviews, reviews });
 };
 
 exports.getMyReviewedBookings = async (req, res) => {
-  try {
-    const reviews = await Review.find({ reviewer: req.userId }).select('booking');
-    res.json(reviews.map(r => r.booking.toString()));
-  } catch (err) {
-    res.status(500).json({ message: 'Reviewed bookings could not be loaded' });
-  }
+  const reviews = await Review.find({ reviewer: req.userId }).select('booking');
+  res.json(reviews.map((r) => r.booking.toString()));
 };

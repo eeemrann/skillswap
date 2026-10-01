@@ -22,7 +22,7 @@ exports.getUnreadCounts = async (req, res) => {
       { $match: { userId: new mongoose.Types.ObjectId(req.userId), read: false } },
       { $group: { _id: '$type', count: { $sum: 1 } } }
     ]);
-    const counts = { all: 0, booking: 0, message: 0, review: 0, credit: 0 };
+    const counts = { all: 0, booking: 0, message: 0, review: 0, credit: 0, session: 0, billing: 0 };
     grouped.forEach(({ _id, count }) => { counts[_id] = count; counts.all += count; });
     res.json(counts);
   } catch (error) {
@@ -48,7 +48,7 @@ exports.markNotificationRead = async (req, res) => {
 exports.markNotificationsRead = async (req, res) => {
   try {
     const filter = { userId: req.userId, read: false };
-    if (req.body.type) filter.type = req.body.type;
+    if (req.body.type) filter.type = String(req.body.type);
     const result = await Notification.updateMany(filter, { read: true });
     res.json({ updated: result.modifiedCount });
   } catch (error) {

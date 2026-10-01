@@ -1,6 +1,7 @@
 const axios = require('axios');
 const Notification = require('../models/Notification');
 const EmailJob = require('../models/EmailJob');
+const { emitToUser } = require('./realtime');
 
 const MAX_EMAIL_ATTEMPTS = 5;
 const CLERK_MANAGED_EMAIL_TYPES = new Set(['EMAIL_VERIFICATION']);
@@ -28,7 +29,6 @@ async function notify(type, recipientEmail, data) {
   } catch (error) {
     console.error('Email notification delivery failed:', {
       type,
-      recipientEmail,
       status: error.response?.status,
       detail: error.response?.data?.message || error.message
     });
@@ -48,7 +48,7 @@ async function queueEmail(type, recipientEmail, data) {
   try {
     return await EmailJob.create({ type, recipientEmail, data });
   } catch (error) {
-    console.error('Email notification queue failed:', { type, recipientEmail, detail: error.message });
+    console.error('Email notification queue failed:', { type, detail: error.message });
     return null;
   }
 }
@@ -72,7 +72,7 @@ async function processNextEmailJob() {
   } else if (job.attempts >= MAX_EMAIL_ATTEMPTS) {
     job.status = 'dead';
     job.lastError = result.error || 'Delivery failed';
-    console.error('Email notification permanently failed:', { jobId: job.id, type: job.type, recipientEmail: job.recipientEmail });
+    console.error('Email notification permanently failed:', { jobId: job.id, type: job.type });
   } else {
     job.status = 'pending';
     job.lastError = result.error || 'Delivery failed';
@@ -104,7 +104,9 @@ function startEmailWorker() {
 
 async function createInAppNotification({ userId, type, message, relatedId }) {
   try {
-    return await Notification.create({ userId, type, message, relatedId });
+    const notification = await Notification.create({ userId, type, message, relatedId });
+    emitToUser(userId, 'notification:new', { type, message });
+    return notification;
   } catch (error) {
     console.error('In-app notification creation failed:', { userId, type, relatedId, detail: error.message });
     return null;

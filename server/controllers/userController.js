@@ -1,23 +1,33 @@
 const mongoose = require('mongoose');
-const User = require('../models/User');
+const crypto = require('crypto');
+const { clerkClient } = require('@clerk/express');
+const { User, Booking, Transaction, Message, Notification, Review } = require('../models');
+const { planFor } = require('../config/plans');
+const { HttpError } = require('../utils/transaction');
+const { getStripe } = require('../services/stripeService');
 
 const ALLOWED_RADIUS_KM = [25, 50, 100, 200, 400];
+const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+const PRO_STATUSES = ['active', 'trialing', 'past_due'];
 
 const parseRadiusKm = (value) => {
   if (String(value || '').trim().toLowerCase() === 'worldwide') return 'worldwide';
   const radiusKm = Number(value);
-  return ALLOWED_RADIUS_KM.includes(radiusKm) ? radiusKm : 25;
+  return ALLOWED_RADIUS_KM.includes(radiusKm) ? radiusKm : 'worldwide';
 };
 
-const cleanSkills = (value) => {
+const cleanList = (value, { max, length = 80 }) => {
   if (!Array.isArray(value)) return [];
   const unique = new Map();
-  value.forEach((skill) => {
-    const cleaned = typeof skill === 'string' ? skill.trim() : '';
-    if (cleaned && cleaned.length <= 80) unique.set(cleaned.toLowerCase(), cleaned);
+  value.forEach((item) => {
+    const cleaned = typeof item === 'string' ? item.trim() : '';
+    if (cleaned && cleaned.length <= length) unique.set(cleaned.toLowerCase(), cleaned);
   });
-  return [...unique.values()].slice(0, 25);
+  return [...unique.values()].slice(0, max);
 };
+const cleanSkills = (value) => cleanList(value, { max: 25 });
+const cleanLanguages = (value) => cleanList(value, { max: 8, length: 40 });
 
 const validCoordinates = (coordinates) => Array.isArray(coordinates)
   && coordinates.length === 2
@@ -25,6 +35,13 @@ const validCoordinates = (coordinates) => Array.isArray(coordinates)
   && coordinates[0] >= -180 && coordinates[0] <= 180
   && coordinates[1] >= -90 && coordinates[1] <= 90
   && !(coordinates[0] === 0 && coordinates[1] === 0);
+
+const validTimezone = (value) => {
+  if (typeof value !== 'string' || !value || value.length > 100) return false;
+  try { new Intl.DateTimeFormat('en-US', { timeZone: value }); return true; } catch { return false; }
+};
+
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const findUserByAnyId = async (id) => {
   if (!id) return null;
@@ -35,227 +52,217 @@ const findUserByAnyId = async (id) => {
   return User.findOne({ clerkId: id });
 };
 
-// GET the logged-in user's own profile
-exports.getProfile = async (req, res) => {
-  try {
-    if (req.user) {
-      const user = req.user.toObject ? req.user.toObject() : { ...req.user };
-      delete user.password;
-      return res.json(user);
-    }
-
-    const user = await findUserByAnyId(req.userId || req.clerkUserId);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    const profile = user.toObject ? user.toObject() : user;
-    delete profile.password;
-    return res.json(profile);
-  } catch (err) {
-    console.error('[getMe] Error fetching user profile:', err);
-    return res.status(500).json({ message: 'Server error retrieving profile' });
-  }
+/** What the signed-in member sees about their own account. */
+const privateProfile = (user) => {
+  const profile = user.toObject ? user.toObject() : { ...user };
+  const plan = planFor(user);
+  const hasBilling = Boolean(profile.stripeCustomerId);
+  delete profile.stripeCustomerId;
+  delete profile.stripeSubscriptionId;
+  return {
+    ...profile,
+    hasBilling,
+    effectivePlan: plan.id,
+    availableCredits: Math.round(((profile.creditBalance || 0) - (profile.creditsHeld || 0)) * 100) / 100,
+    limits: { maxActiveBookings: plan.maxActiveBookings, maxSessionMinutes: plan.maxSessionMinutes, serviceFeePct: plan.serviceFeePct }
+  };
 };
 
+/** Community-facing view: no email, balances, billing, or exact coordinates. */
+const publicProfile = (user) => {
+  const profile = user.toObject ? user.toObject() : { ...user };
+  return {
+    _id: profile._id,
+    name: profile.name,
+    profilePicture: profile.profilePicture,
+    bio: profile.bio,
+    skillsOffered: profile.skillsOffered,
+    skillsWanted: profile.skillsWanted,
+    languages: profile.languages || [],
+    timezone: profile.timezone,
+    availability: profile.availability || [],
+    location: { city: profile.location?.city || '', country: profile.location?.country || '' },
+    isPro: planFor(profile).id === 'pro',
+    createdAt: profile.createdAt
+  };
+};
+
+exports.getProfile = async (req, res) => res.json(privateProfile(req.user));
 exports.getMe = exports.getProfile;
 
-// Return only fields that are appropriate for a community-facing profile.
 exports.getPublicProfile = async (req, res) => {
-  try {
-    const user = await findUserByAnyId(req.params.id);
-    if (!user || user.status === 'suspended') return res.status(404).json({ message: 'Member not found' });
-    const profile = user.toObject();
-    const { password, email, clerkId, googleId, tokenVersion, creditBalance, role, status, ...publicProfile } = profile;
-    return res.json(publicProfile);
-  } catch (err) {
-    return res.status(500).json({ message: 'Could not retrieve this member profile' });
-  }
-};
-
-// UPDATE the logged-in user's skills
-exports.updateSkills = async (req, res) => {
-  try {
-    const skillsOffered = cleanSkills(req.body.skillsOffered);
-    const skillsWanted = cleanSkills(req.body.skillsWanted);
-
-    const user = await User.findByIdAndUpdate(
-      req.userId,
-      { skillsOffered, skillsWanted },
-      { new: true, runValidators: true }
-    ).select('-password');
-
-    res.json(user);
-  } catch (err) {
-    res.status(500).json({ message: 'Skills could not be updated' });
-  }
-};
-
-exports.updateProfile = async (req, res) => {
-  try {
-    const user = req.user || await findUserByAnyId(req.userId || req.clerkUserId);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    const { bio, timezone, location, availability } = req.body;
-    if (bio !== undefined) user.bio = typeof bio === 'string' ? bio.trim() : '';
-    if (timezone !== undefined) user.timezone = typeof timezone === 'string' ? timezone.trim() : 'UTC';
-    if (Array.isArray(availability)) user.availability = availability.filter((slot) => slot && slot.day && slot.start && slot.end);
-
-    if (location && typeof location === 'object') {
-      const coordinates = location.coordinates;
-      if (coordinates !== undefined && validCoordinates(coordinates)) {
-        user.location = user.location || {};
-        user.location.type = 'Point';
-        user.location.coordinates = [...coordinates];
-      } else if (coordinates !== undefined && coordinates !== null) {
-        return res.status(400).json({ message: 'Location coordinates must be [longitude, latitude]' });
-      }
-      user.location = user.location || {};
-      if (location.city !== undefined) user.location.city = String(location.city).trim();
-      if (location.country !== undefined) user.location.country = String(location.country).trim();
-      if (!validCoordinates(user.location.coordinates)) {
-        user.location.type = undefined;
-        user.location.coordinates = undefined;
-      }
-    }
-
-    const updatedUser = await user.save();
-    const profile = updatedUser.toObject();
-    delete profile.password;
-    return res.json(profile);
-  } catch (err) {
-    res.status(400).json({ message: 'Profile update failed' });
-  }
-};
-
-// GET all other users (for browsing skills) — excludes the logged-in user and passwords
-exports.getAllUsers = async (req, res) => {
-  const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
-  const page = Math.max(Number(req.query.page) || 1, 1);
-  const radiusKm = parseRadiusKm(req.query.radiusKm);
-  const requesterFilter = mongoose.Types.ObjectId.isValid(req.userId)
-    ? { _id: { $ne: new mongoose.Types.ObjectId(req.userId) } }
-    : {};
-  const fallback = () => User.find({ ...requesterFilter, status: { $ne: 'suspended' } })
-    .select('-password').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean();
-  try {
-    const lng = Number(req.query.lng);
-    const lat = Number(req.query.lat);
-    const hasValidQueryCoordinates = req.query.lng !== undefined && req.query.lat !== undefined
-      && Number.isFinite(lng) && Number.isFinite(lat)
-      && lng >= -180 && lng <= 180 && lat >= -90 && lat <= 90;
-    if (!hasValidQueryCoordinates) return res.set('X-Location-Fallback', 'true').status(200).json(await fallback());
-    if (radiusKm === 'worldwide') return res.status(200).json(await fallback());
-    console.log('Querying near:', [lng, lat], 'Requester ID:', req.userId);
-    const maxDistanceMeters = radiusKm * 1000;
-    const users = await User.aggregate([
-      { $geoNear: {
-        near: { type: 'Point', coordinates: [lng, lat] },
-        distanceField: 'distanceMeters', maxDistance: maxDistanceMeters,
-        query: { ...requesterFilter, status: { $ne: 'suspended' }, 'location.type': 'Point', 'location.coordinates': { $exists: true, $ne: [] } },
-        spherical: true
-      } },
-      { $addFields: { distanceKm: { $round: [{ $divide: ['$distanceMeters', 1000] }, 1] } } },
-      {
-        $lookup: {
-          from: 'reviews',           // Mongoose auto-pluralizes the 'Review' model to this collection name
-          localField: '_id',
-          foreignField: 'reviewee',
-          as: 'reviews'
-        }
-      },
-      {
-        $addFields: {
-          averageRating: {
-            $cond: [{ $gt: [{ $size: '$reviews' }, 0] }, { $round: [{ $avg: '$reviews.rating' }, 1] }, 0]
-          },
-          reviewCount: { $size: '$reviews' }
-        }
-      },
-      {
-        $project: {
-          name: 1, bio: 1, skillsOffered: 1, skillsWanted: 1,
-          location: 1, timezone: 1, availability: 1,
-          averageRating: 1, reviewCount: 1
-        }
-      },
-      { $sort: { createdAt: -1 } },
-      { $skip: (page - 1) * limit },
-      { $limit: limit }
-    ]);
-    console.log('Found nearby users count:', users.length);
-    if (users.length === 0) {
-      console.log(`GeoNear returned 0 within ${radiusKm}km.`);
-      return res.status(200).json(users);
-    }
-    return res.status(200).json(users);
-  } catch (err) {
-    console.warn('Nearby user lookup unavailable; falling back to all active users:', err.message);
-    try {
-      return res.set('X-Location-Fallback', 'true').status(200).json(await fallback());
-    } catch (fallbackError) {
-      console.error('User fallback lookup failed:', fallbackError.message);
-      return res.status(200).json([]);
-    }
-  }
-};
-
-exports.updateCoordinates = async (req, res) => {
-  const { longitude, latitude } = req.body;
-  if (typeof longitude !== 'number' || typeof latitude !== 'number'
-    || !Number.isFinite(longitude) || !Number.isFinite(latitude)
-    || longitude < -180 || longitude > 180 || latitude < -90 || latitude > 90) {
-    return res.status(400).json({ message: 'Valid longitude and latitude are required' });
-  }
-
-  try {
-    const user = await User.findByIdAndUpdate(req.userId, {
-      $set: {
-        'location.type': 'Point',
-        'location.coordinates': [longitude, latitude],
-        'location.lastUpdated': new Date()
-      }
-    }, { new: true, runValidators: true }).select('location');
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    return res.json({ location: user.location });
-  } catch (err) {
-    return res.status(400).json({ message: 'Location could not be updated' });
-  }
+  const user = await findUserByAnyId(req.params.id);
+  if (!user || user.status === 'suspended') throw new HttpError(404, 'Member not found');
+  const [sessionsTaught, sessionsLearned] = await Promise.all([
+    Booking.countDocuments({ provider: user._id, status: 'completed' }),
+    Booking.countDocuments({ requester: user._id, status: 'completed' })
+  ]);
+  res.json({ ...publicProfile(user), sessionsTaught, sessionsLearned });
 };
 
 exports.updateCompleteProfile = async (req, res) => {
-  try {
-    const { bio, timezone, location, availability } = req.body;
-    const cleanAvailability = Array.isArray(availability) ? availability.filter((slot) => slot?.day && slot?.start && slot?.end).slice(0, 30) : [];
-    if (cleanAvailability.some((slot) => slot.start >= slot.end)) return res.status(400).json({ message: 'Availability end time must be after start time' });
-    const user = req.user || await findUserByAnyId(req.userId || req.clerkUserId);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    user.skillsOffered = cleanSkills(req.body.skillsOffered);
-    user.skillsWanted = cleanSkills(req.body.skillsWanted);
-    user.bio = typeof bio === 'string' ? bio.trim() : '';
-    user.timezone = typeof timezone === 'string' && timezone.length <= 100 ? timezone.trim() : 'UTC';
-    user.availability = cleanAvailability;
-    /*
-     * Location is intentionally patched on the loaded document. This keeps
-     * existing coordinates intact when the profile form only sends city and
-     * country, and never creates a Point without coordinates.
-     */
-    if (location && typeof location === 'object') {
-      user.location = user.location || {};
-      if (location.city !== undefined) user.location.city = String(location.city).trim().slice(0, 100);
-      if (location.country !== undefined) user.location.country = String(location.country).trim().slice(0, 100);
-      if (location.coordinates !== undefined) {
-        if (!validCoordinates(location.coordinates)) return res.status(400).json({ message: 'Location coordinates must be [longitude, latitude]' });
-        user.location.type = 'Point';
-        user.location.coordinates = [...location.coordinates];
-      }
-      if (!validCoordinates(user.location.coordinates)) {
-        user.location.type = undefined;
-        user.location.coordinates = undefined;
-      }
-    }
-    const updatedUser = await user.save();
-    const profile = updatedUser.toObject();
-    delete profile.password;
-    return res.json(profile);
-  } catch (error) {
-    console.error('[updateProfile Error]:', error.message, error.errors);
-    return res.status(400).json({ message: error.message || 'Profile update failed' });
+  const { bio, timezone, location, availability } = req.body;
+  const slots = Array.isArray(availability) ? availability.filter((slot) => slot?.day && slot?.start && slot?.end).slice(0, 35) : [];
+  if (slots.some((slot) => !DAYS.includes(slot.day) || !TIME_PATTERN.test(slot.start) || !TIME_PATTERN.test(slot.end))) {
+    throw new HttpError(400, 'Availability must use a weekday and HH:MM times');
   }
+  if (slots.some((slot) => slot.start >= slot.end)) throw new HttpError(400, 'Availability end time must be after start time');
+
+  const user = req.user;
+  if (req.body.skillsOffered !== undefined) user.skillsOffered = cleanSkills(req.body.skillsOffered);
+  if (req.body.skillsWanted !== undefined) user.skillsWanted = cleanSkills(req.body.skillsWanted);
+  if (req.body.languages !== undefined) user.languages = cleanLanguages(req.body.languages);
+  if (typeof bio === 'string') user.bio = bio.trim().slice(0, 500);
+  if (timezone !== undefined) user.timezone = validTimezone(timezone) ? timezone : 'UTC';
+  if (Array.isArray(availability)) user.availability = slots;
+
+  // Patch the loaded location so existing coordinates survive a city/country-only edit,
+  // and never persist a Point without coordinates.
+  if (location && typeof location === 'object') {
+    user.location = user.location || {};
+    if (location.city !== undefined) user.location.city = String(location.city).trim().slice(0, 100);
+    if (location.country !== undefined) user.location.country = String(location.country).trim().slice(0, 100);
+    if (location.coordinates !== undefined) {
+      if (!validCoordinates(location.coordinates)) throw new HttpError(400, 'Location coordinates must be [longitude, latitude]');
+      user.location.type = 'Point';
+      user.location.coordinates = [...location.coordinates];
+    }
+    if (!validCoordinates(user.location.coordinates)) {
+      user.location.type = undefined;
+      user.location.coordinates = undefined;
+    }
+  }
+  await user.save();
+  res.json(privateProfile(user));
 };
+
+/** Explicit, member-initiated location update. */
+exports.updateCoordinates = async (req, res) => {
+  const { longitude, latitude } = req.body;
+  if (!validCoordinates([longitude, latitude])) throw new HttpError(400, 'Valid longitude and latitude are required');
+  const user = await User.findByIdAndUpdate(req.userId, {
+    $set: { 'location.type': 'Point', 'location.coordinates': [longitude, latitude], 'location.lastUpdated': new Date() }
+  }, { new: true, runValidators: true }).select('location');
+  if (!user) throw new HttpError(404, 'Member not found');
+  res.json({ location: { city: user.location?.city || '', country: user.location?.country || '', hasCoordinates: true } });
+};
+
+exports.clearLocation = async (req, res) => {
+  await User.updateOne({ _id: req.userId }, { $unset: { location: 1 } });
+  res.json({ location: null });
+};
+
+/**
+ * Member directory. Optional `q` searches names and skills; with coordinates
+ * and a radius it returns nearby members ordered by Pro placement, then distance.
+ */
+exports.getAllUsers = async (req, res) => {
+  const limit = Math.min(Math.max(Number(req.query.limit) || 24, 1), 60);
+  const page = Math.max(Number(req.query.page) || 1, 1);
+  const radiusKm = parseRadiusKm(req.query.radiusKm);
+  const q = String(req.query.q || '').trim().slice(0, 80);
+  const lng = Number(req.query.lng);
+  const lat = Number(req.query.lat);
+  const hasCoordinates = req.query.lng !== undefined && req.query.lat !== undefined && validCoordinates([lng, lat]);
+  const useGeo = hasCoordinates && radiusKm !== 'worldwide';
+
+  const match = {
+    _id: { $ne: new mongoose.Types.ObjectId(req.userId) },
+    status: { $ne: 'suspended' },
+    'skillsOffered.0': { $exists: true }
+  };
+  if (q) {
+    const pattern = new RegExp(escapeRegex(q), 'i');
+    match.$or = [{ name: pattern }, { skillsOffered: pattern }, { skillsWanted: pattern }];
+  }
+
+  const isPro = { $cond: [{ $and: [{ $eq: ['$plan', 'pro'] }, { $in: [{ $ifNull: ['$planStatus', 'active'] }, PRO_STATUSES] }] }, true, false] };
+  const pipeline = [];
+  if (useGeo) {
+    pipeline.push({ $geoNear: {
+      near: { type: 'Point', coordinates: [lng, lat] },
+      distanceField: 'distanceMeters',
+      maxDistance: radiusKm * 1000,
+      query: { ...match, 'location.type': 'Point' },
+      spherical: true
+    } });
+  } else {
+    pipeline.push({ $match: match });
+  }
+  pipeline.push(
+    { $addFields: { isPro: isPro } },
+    { $facet: {
+      items: [
+        { $sort: useGeo ? { isPro: -1, distanceMeters: 1, _id: 1 } : { isPro: -1, createdAt: -1, _id: 1 } },
+        { $skip: (page - 1) * limit },
+        { $limit: limit },
+        { $lookup: {
+          from: 'reviews',
+          let: { id: '$_id' },
+          pipeline: [
+            { $match: { $expr: { $eq: ['$reviewee', '$$id'] } } },
+            { $group: { _id: null, average: { $avg: '$rating' }, count: { $sum: 1 } } }
+          ],
+          as: 'ratingSummary'
+        } },
+        { $project: {
+          name: 1, bio: 1, profilePicture: 1, skillsOffered: 1, skillsWanted: 1, languages: 1, timezone: 1, isPro: 1, createdAt: 1,
+          'location.city': 1, 'location.country': 1,
+          distanceKm: useGeo ? { $round: [{ $divide: ['$distanceMeters', 1000] }, 1] } : '$$REMOVE',
+          averageRating: { $round: [{ $ifNull: [{ $first: '$ratingSummary.average' }, 0] }, 1] },
+          reviewCount: { $ifNull: [{ $first: '$ratingSummary.count' }, 0] }
+        } }
+      ],
+      total: [{ $count: 'count' }]
+    } }
+  );
+
+  const [result] = await User.aggregate(pipeline);
+  res.set('X-Total-Count', String(result?.total?.[0]?.count || 0)).json(result?.items || []);
+};
+
+/** GDPR-style export of everything the platform holds about the signed-in member. */
+exports.exportData = async (req, res) => {
+  const id = req.user._id;
+  const [bookings, transactions, messages, reviews] = await Promise.all([
+    Booking.find({ $or: [{ requester: id }, { provider: id }] }).select('-roomId').lean(),
+    Transaction.find({ $or: [{ from: id }, { to: id }] }).lean(),
+    Message.find({ $or: [{ sender: id }, { recipient: id }] }).lean(),
+    Review.find({ $or: [{ reviewer: id }, { reviewee: id }] }).lean()
+  ]);
+  res.set('Content-Disposition', 'attachment; filename="skillswap-data.json"').json({
+    exportedAt: new Date().toISOString(), profile: privateProfile(req.user), bookings, transactions, messages, reviews
+  });
+};
+
+/**
+ * Deletes the member's account. Personal data is erased and the record becomes
+ * an anonymous tombstone so other members' history stays consistent.
+ */
+exports.deleteAccount = async (req, res) => {
+  const user = req.user;
+  const obligations = await Booking.countDocuments({ status: 'accepted', $or: [{ requester: user._id }, { provider: user._id }] });
+  if (obligations > 0) throw new HttpError(409, 'Cancel or complete your upcoming sessions before deleting your account');
+
+  const stripe = getStripe();
+  if (stripe && user.stripeSubscriptionId) {
+    await stripe.subscriptions.cancel(user.stripeSubscriptionId).catch((error) => console.warn('Subscription cancel on delete failed:', error.message));
+  }
+  await Booking.updateMany({ status: 'pending', $or: [{ requester: user._id }, { provider: user._id }] }, { status: 'cancelled', cancelledBy: user._id, cancelReason: 'Account deleted' });
+  await Promise.all([Message.deleteMany({ $or: [{ sender: user._id }, { recipient: user._id }] }), Notification.deleteMany({ userId: user._id })]);
+
+  const clerkId = user.clerkId;
+  await User.collection.updateOne({ _id: user._id }, {
+    $set: {
+      name: 'Deleted member', email: `deleted-${user._id}-${crypto.randomBytes(4).toString('hex')}@deleted.invalid`, profilePicture: '', bio: '',
+      skillsOffered: [], skillsWanted: [], languages: [], availability: [], status: 'suspended', plan: 'free', planStatus: 'canceled', creditsHeld: 0
+    },
+    $unset: { clerkId: '', location: '', stripeSubscriptionId: '', stripeCustomerId: '' }
+  });
+  if (clerkId) await clerkClient.users.deleteUser(clerkId).catch((error) => console.warn('Clerk user deletion failed:', error.message));
+  res.json({ message: 'Your account has been deleted' });
+};
+
+exports.privateProfile = privateProfile;
+exports.publicProfile = publicProfile;
+exports.validCoordinates = validCoordinates;

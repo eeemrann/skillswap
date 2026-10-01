@@ -37,21 +37,37 @@ services:
       - NOTIFICATION_SERVICE_API_KEY=${LOCAL_NOTIFICATION_SERVICE_API_KEY:-local-notification-key-change-me}
     restart: unless-stopped
 
+  # Optional TURN relay for video sessions: docker compose --profile turn up
+  turn:
+    profiles: ["turn"]
+    image: coturn/coturn:4.6
+    network_mode: host
+    command: ["-c", "/etc/coturn/turnserver.conf", "--static-auth-secret=${TURN_SECRET:-local-turn-secret-change-me}"]
+    volumes:
+      - ./infra/turnserver.conf:/etc/coturn/turnserver.conf:ro
+    restart: unless-stopped
+
   server:
     build: ./server
     ports:
       - "5000:5000"
     environment:
       - MONGO_URI=mongodb://mongo:27017/skillswap?replicaSet=rs0
-      - JWT_SECRET=${LOCAL_JWT_SECRET:-local-jwt-secret-change-me}
+      - CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY}
       - CLERK_SECRET_KEY=${CLERK_SECRET_KEY}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - PORT=5000
+      - APP_URL=http://localhost:8080
+      - CLIENT_ORIGINS=http://localhost:8080
       - MATCHING_SERVICE_URL=http://matching-service:6000
       - NOTIFICATION_SERVICE_URL=http://notification-service:7000
       - NOTIFICATION_SERVICE_TIMEOUT_MS=30000
       - NOTIFICATION_SERVICE_API_KEY=${LOCAL_NOTIFICATION_SERVICE_API_KEY:-local-notification-key-change-me}
-      - CLIENT_ORIGINS=http://localhost:8080
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+      - SIGNUP_CREDITS=${SIGNUP_CREDITS:-3}
+      - STUN_URLS=${STUN_URLS:-stun:stun.l.google.com:19302}
+      - TURN_URLS=${TURN_URLS:-}
+      - TURN_SECRET=${TURN_SECRET:-local-turn-secret-change-me}
     depends_on:
       mongo-init:
         condition: service_completed_successfully
@@ -65,7 +81,6 @@ services:
     build:
       context: ./client
       args:
-        - VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
         - VITE_API_URL=${VITE_API_URL:-http://localhost:5000/api}
         - VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY}
     ports:

@@ -1,0 +1,72 @@
+/* ───────────── Pre-join lobby ───────────── */
+.call-page { min-height: 100vh; background: var(--bg); }
+.call-page.in-call { background: #0b0d16; }
+.call-page-head { padding: 14px 20px; }
+.lobby { max-width: 1120px; margin: 0 auto; padding: 8px 20px 48px; display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 900px) { .lobby { grid-template-columns: minmax(0, 1fr); } }
+.lobby-preview { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.preview-frame { position: relative; aspect-ratio: 16 / 10; border-radius: 16px; overflow: hidden; background: #131629; display: grid; place-items: center; }
+.preview-frame video { width: 100%; height: 100%; object-fit: cover; }
+.preview-off { display: flex; flex-direction: column; align-items: center; gap: 12px; color: #aab0c6; }
+.preview-controls { position: absolute; left: 0; right: 0; bottom: 14px; display: flex; justify-content: center; gap: 12px; }
+.facts { display: flex; flex-direction: column; gap: 10px; font-size: 14.5px; }
+.facts li { display: flex; gap: 10px; align-items: center; }
+.facts svg { color: var(--brand-ink); flex: none; }
+.note { padding: 10px 14px; background: var(--surface-2); border-radius: 10px; font-style: italic; }
+.mirror { transform: scaleX(-1); }
+.ended { min-height: 80vh; display: grid; place-items: center; padding: 24px; }
+.ended-card { width: min(520px, 100%); align-items: flex-start; }
+
+/* ───────────── Call surface ───────────── */
+.call { position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column; background: #0b0d16; color: #f2f4f9; --call-surface: #1b1f33; --call-border: rgba(255, 255, 255, 0.1); }
+.call-muted { color: #8f97b3; }
+.call-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 18px; }
+.call-timer { display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 99px; background: var(--call-surface); font-variant-numeric: tabular-nums; font-weight: 600; font-size: 14px; }
+.call-timer.warn { background: #4a3410; color: #fbbf24; }
+.call-timer.over { background: #4a1a18; color: #ff8a80; }
+.call-top-right { justify-content: flex-end; min-width: 0; }
+.call-btn { color: #c3c8e0; }
+.call-btn:hover { background: var(--call-surface); color: #fff; }
+.quality { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 99px; font-size: 12.5px; font-weight: 600; text-transform: capitalize; background: var(--call-surface); }
+.quality.good { color: #4ade80; } .quality.fair { color: #fbbf24; } .quality.poor { color: #ff8a80; }
+.call-body { flex: 1; min-height: 0; display: flex; gap: 12px; padding: 0 12px; }
+.stage { position: relative; flex: 1; min-width: 0; border-radius: 18px; overflow: hidden; background: radial-gradient(700px 400px at 30% 20%, #20244a, #10131f); display: grid; place-items: center; }
+.stage > video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
+.stage-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding: 20px; }
+.stage-badges { position: absolute; top: 14px; left: 14px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.pill { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 99px; font-size: 13px; font-weight: 600; background: rgba(15, 18, 32, 0.78); backdrop-filter: blur(8px); }
+.pill.brand { background: rgba(91, 91, 240, 0.85); }
+.pill.warn { background: rgba(120, 80, 10, 0.88); color: #fde68a; }
+.pip { position: absolute; right: 14px; bottom: 14px; width: clamp(120px, 22%, 240px); aspect-ratio: 4 / 3; border-radius: 14px; overflow: hidden; background: #23284a; display: grid; place-items: center; border: 1px solid rgba(255, 255, 255, 0.18); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); }
+.pip video { width: 100%; height: 100%; object-fit: cover; }
+.pip-label { position: absolute; left: 6px; bottom: 6px; font-size: 11.5px; padding: 2px 8px; border-radius: 99px; background: rgba(0, 0, 0, 0.6); }
+.controls { display: flex; justify-content: center; gap: 12px; padding: 16px 12px calc(18px + env(safe-area-inset-bottom)); flex-wrap: wrap; }
+.ctrl { position: relative; width: 52px; height: 52px; border-radius: 50%; border: 0; display: grid; place-items: center; background: var(--call-surface); color: #fff; transition: background 0.15s, transform 0.1s; }
+.ctrl:hover:not(:disabled) { background: #2a3050; }
+.ctrl:active:not(:disabled) { transform: scale(0.95); }
+.ctrl:disabled { opacity: 0.4; cursor: not-allowed; }
+.ctrl.off { background: #fff; color: #11141f; }
+.ctrl.active { background: var(--brand); }
+.ctrl.end { background: #e5484d; width: 64px; border-radius: 26px; }
+.ctrl.end:hover { background: #f06267; }
+.ctrl-dot { position: absolute; top: 8px; right: 8px; width: 11px; height: 11px; border-radius: 50%; background: #ef4444; border: 2px solid var(--call-surface); }
+.preview-controls .ctrl { width: 46px; height: 46px; background: rgba(15, 18, 32, 0.8); backdrop-filter: blur(6px); }
+.preview-controls .ctrl.off { background: #e5484d; color: #fff; }
+
+.call-panel { width: 340px; flex: none; display: flex; flex-direction: column; background: var(--call-surface); border-radius: 18px; overflow: hidden; }
+.call-panel header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 12px 18px; border-bottom: 1px solid var(--call-border); }
+.call-panel .btn-ghost { color: #c3c8e0; }
+.call-chat { flex: 1; overflow: auto; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.call-chat .bubble { background: #2a3050; color: #fff; }
+.call-chat .bubble.mine { background: var(--brand); }
+.call-compose { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--call-border); flex-wrap: wrap; }
+.call-compose .input { flex: 1; min-width: 0; background: #11141f; border-color: var(--call-border); color: #fff; }
+.call-compose .tiny { width: 100%; color: #ff8a80; }
+@media (max-width: 820px) {
+  .call-body { flex-direction: column; padding: 0 8px; }
+  .call-panel { position: absolute; inset: 56px 8px 96px; width: auto; z-index: 5; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6); }
+  .pip { width: 112px; }
+  .ctrl { width: 46px; height: 46px; }
+  .ctrl.end { width: 56px; }
+  .controls { gap: 8px; }
+}

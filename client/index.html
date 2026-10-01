@@ -3,10 +3,29 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SkillSwap | Trade skills, share time</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>SkillSwap | Trade skills over live video</title>
+    <meta name="description" content="SkillSwap is a marketplace for live one-to-one video lessons. Teach what you know, learn what you want, and pay with time credits. 1 credit = 1 hour." />
+    <meta name="theme-color" content="#5b5bf0" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="SkillSwap" />
+    <meta property="og:title" content="SkillSwap | Trade skills over live video" />
+    <meta property="og:description" content="Teach for an hour, earn an hour. Live one-to-one video sessions with built-in screen sharing and chat." />
+    <meta name="twitter:card" content="summary" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+    <script>
+      // Apply the saved theme before first paint to avoid a light/dark flash.
+      try {
+        var pref = localStorage.getItem('skillswap-theme') || 'system';
+        var dark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      } catch (e) {}
+    </script>
   </head>
   <body>
+    <noscript>SkillSwap needs JavaScript to run live video sessions.</noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

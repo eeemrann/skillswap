@@ -1,36 +1,39 @@
 import { createSlice } from '@reduxjs/toolkit';
 
-const storedUser = sessionStorage.getItem('user');
+const CACHE_KEY = 'user';
 
 const normalize = (user) => ({ ...user, id: user.id || user._id });
 
+const readCache = () => {
+  try {
+    const raw = sessionStorage.getItem(CACHE_KEY);
+    return raw ? normalize(JSON.parse(raw)) : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeCache = (user) => {
+  try {
+    if (user) sessionStorage.setItem(CACHE_KEY, JSON.stringify(user));
+    else sessionStorage.removeItem(CACHE_KEY);
+  } catch { /* storage unavailable */ }
+};
+
 const authSlice = createSlice({
   name: 'auth',
-  initialState: {
-    user: storedUser ? normalize(JSON.parse(storedUser)) : null,
-    token: sessionStorage.getItem('token') || null
-  },
+  initialState: { user: readCache() },
   reducers: {
-    setCredentials: (state, action) => {
-      const user = normalize(action.payload.user);
-      state.user = user;
-      state.token = action.payload.token;
-      sessionStorage.setItem('token', action.payload.token);
-      sessionStorage.setItem('user', JSON.stringify(user));
-    },
     updateUser: (state, action) => {
-      const user = normalize(action.payload);
-      state.user = user;
-      sessionStorage.setItem('user', JSON.stringify(user));
+      state.user = normalize(action.payload);
+      writeCache(state.user);
     },
     logout: (state) => {
       state.user = null;
-      state.token = null;
-      sessionStorage.removeItem('token');
-      sessionStorage.removeItem('user');
+      writeCache(null);
     }
   }
 });
 
-export const { setCredentials, updateUser, logout } = authSlice.actions;
+export const { updateUser, logout } = authSlice.actions;
 export default authSlice.reducer;

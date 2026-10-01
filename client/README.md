@@ -1,16 +1,17 @@
-# React + Vite
+# SkillSwap web app
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19 + Vite single-page app. See the [root README](../README.md) for the product overview, architecture and setup.
 
-Currently, two official plugins are available:
+```bash
+cp .env.example .env     # VITE_CLERK_PUBLISHABLE_KEY, VITE_API_URL
+npm install
+npm run dev              # http://localhost:5173
+npm run lint && npm run build
+```
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Notable code:
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- `src/lib/call.js`: the WebRTC engine behind live sessions (media, negotiation, reconnection, screen share, stats).
+- `src/pages/Session.jsx`: pre-join lobby, call UI, post-call confirmation.
+- `src/lib/hooks.js`: `useQuery` (data + polling), plus small UI hooks written to satisfy the React Compiler lint rules.
+- `src/styles/`: design tokens and light/dark themes (`base.css`), app shell and pages (`app.css`), marketing site (`marketing.css`), call surface (`session.css`).

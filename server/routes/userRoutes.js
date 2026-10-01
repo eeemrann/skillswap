@@ -1,14 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/authMiddleware');
-const { getProfile, getPublicProfile, updateSkills, updateCoordinates, updateProfile, updateCompleteProfile, getAllUsers } = require('../controllers/userController');
+const { writeLimiter } = require('../middleware/rateLimits');
+const { getProfile, getPublicProfile, updateCoordinates, clearLocation, updateCompleteProfile, getAllUsers, exportData, deleteAccount } = require('../controllers/userController');
 
 router.get('/', auth, getAllUsers);
 router.get('/me', auth, getProfile);
-router.put('/me/skills', auth, updateSkills);
-router.patch('/me/location', auth, updateCoordinates);
-router.put('/me/profile', auth, updateProfile);
-router.put('/me', auth, updateCompleteProfile);
+router.put('/me', auth, writeLimiter, updateCompleteProfile);
+router.patch('/me/location', auth, writeLimiter, updateCoordinates);
+router.delete('/me/location', auth, writeLimiter, clearLocation);
+router.get('/me/export', auth, exportData);
+router.delete('/me', auth, writeLimiter, deleteAccount);
 router.get('/:id', auth, getPublicProfile);
 
 module.exports = router;

@@ -1,11 +1,9 @@
 const express = require('express');
 const cors = require('cors');
-const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const mongoose = require('mongoose');
 const { clerkMiddleware } = require('@clerk/express');
 
-const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 const creditRoutes = require('./routes/creditRoutes');
@@ -14,63 +12,49 @@ const reviewRoutes = require('./routes/reviewRoutes');
 const messageRoutes = require('./routes/messageRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const sessionRoutes = require('./routes/sessionRoutes');
+const billingRoutes = require('./routes/billingRoutes');
+const { webhook } = require('./controllers/billingController');
+const { apiLimiter } = require('./middleware/rateLimits');
+const { configuredOrigins } = require('./config');
+const { HttpError } = require('./utils/transaction');
 
 const app = express();
 
 if (!process.env.CLERK_SECRET_KEY) {
-  console.warn('[Clerk] CLERK_SECRET_KEY is not configured; Clerk token verification may fail.');
+  console.warn('[Clerk] CLERK_SECRET_KEY is not configured; token verification will fail.');
 }
 
-// TEMP AUTH DEBUG: remove after diagnosing intermittent 401 responses.
-console.warn('[Clerk Debug] Key prefixes', {
-  secretKey: process.env.CLERK_SECRET_KEY ? `${process.env.CLERK_SECRET_KEY.slice(0, 12)}...` : 'MISSING',
-  publishableKey: process.env.CLERK_PUBLISHABLE_KEY ? `${process.env.CLERK_PUBLISHABLE_KEY.slice(0, 12)}...` : 'MISSING'
-});
-
 app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS || 1));
-const normalizeOrigin = (value) => value.trim().replace(/\/+$/, '');
-const defaultOrigins = [
-  'https://skillswap-io.vercel.app',
-  'http://localhost:5173',
-  'http://localhost:8080'
-];
-const configuredOrigins = (process.env.CLIENT_ORIGINS || process.env.CLIENT_ORIGIN || '')
-  .split(',')
-  .map(normalizeOrigin)
-  .filter(Boolean);
-const allowedOrigins = [...new Set([...defaultOrigins, ...configuredOrigins].flatMap((origin) => {
-  if (origin.startsWith('https://')) return [origin, origin.replace(/^https:\/\//, 'http://')];
-  if (origin.startsWith('http://')) return [origin, origin.replace(/^http:\/\//, 'https://')];
-  return [origin];
-}))];
+
+const devOrigins = process.env.NODE_ENV === 'production' ? [] : ['http://localhost:5173', 'http://localhost:8080'];
+const allowedOrigins = [...new Set([...devOrigins, ...configuredOrigins()])];
 const corsOptions = {
   origin(origin, callback) {
-    if (!origin) return callback(null, true);
-    return callback(null, allowedOrigins.includes(normalizeOrigin(origin)));
+    if (!origin) return callback(null, true); // same-origin, curl, Stripe webhooks
+    return callback(null, allowedOrigins.includes(origin.replace(/\/+$/, '')));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'X-Requested-With', 'Accept'],
-  exposedHeaders: ['X-Total-Count', 'X-Location-Fallback']
+  exposedHeaders: ['X-Total-Count']
 };
 app.use(helmet());
 app.use(cors(corsOptions));
 // Express 5 requires a named wildcard parameter for a catch-all route.
 app.options('/{*splat}', cors(corsOptions));
+
+// Stripe signs the exact bytes it sends, so this route needs the raw body and must precede express.json().
+app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), webhook);
+
 app.use(express.json({ limit: '100kb' }));
-app.use(clerkMiddleware(process.env.CLERK_SECRET_KEY
-  ? { secretKey: process.env.CLERK_SECRET_KEY }
-  : {}));
+app.use(clerkMiddleware(process.env.CLERK_SECRET_KEY ? { secretKey: process.env.CLERK_SECRET_KEY } : {}));
+app.use('/api', apiLimiter);
 
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  message: { message: 'Too many attempts, please try again later' }
-});
-
-app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/bookings', bookingRoutes);
+app.use('/api/sessions', sessionRoutes);
+app.use('/api/billing', billingRoutes);
 app.use('/api/credits', creditRoutes);
 app.use('/api/matches', matchRoutes);
 app.use('/api/reviews', reviewRoutes);
@@ -89,9 +73,13 @@ app.get('/health', (req, res) => {
 
 app.use((req, res) => res.status(404).json({ message: 'Route not found' }));
 app.use((err, req, res, next) => {
-  console.error('Unhandled request error:', { method: req.method, path: req.originalUrl, detail: err.message });
   if (res.headersSent) return next(err);
-  return res.status(err.message === 'Origin is not allowed' ? 403 : 500).json({ message: 'Request could not be completed' });
+  if (err instanceof HttpError) return res.status(err.status).json({ message: err.message, ...err.extra });
+  if (err.type === 'entity.parse.failed') return res.status(400).json({ message: 'Malformed JSON body' });
+  if (err.type === 'entity.too.large') return res.status(413).json({ message: 'Request body is too large' });
+  console.error('Unhandled request error:', { method: req.method, path: req.originalUrl, detail: err.message });
+  return res.status(500).json({ message: 'Request could not be completed' });
 });
 
 module.exports = app;
+module.exports.allowedOrigins = allowedOrigins;

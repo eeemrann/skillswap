@@ -24,6 +24,7 @@ jobs:
 
       - run: npm ci
 
+      # Integration tests run real MongoDB transactions against an in-memory replica set.
       - run: npm test
 
 

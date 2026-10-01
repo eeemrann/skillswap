@@ -3,8 +3,13 @@ import { BrowserRouter } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { store } from './redux/store';
 import App, { ClerkRouterProvider } from './App.jsx';
-import './index.css';
-import './App.css';
+import { applyTheme } from './lib/theme';
+import './styles/base.css';
+import './styles/app.css';
+import './styles/marketing.css';
+import './styles/session.css';
+
+applyTheme();
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <BrowserRouter>
