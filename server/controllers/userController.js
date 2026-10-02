@@ -1,8 +1,9 @@
 const mongoose = require('mongoose');
 const crypto = require('crypto');
 const { clerkClient } = require('@clerk/express');
-const { User, Booking, Transaction, Message, Notification, Review } = require('../models');
-const { planFor } = require('../config/plans');
+const { User, Booking, Transaction, Message, Notification, Review, TeacherApplication, TeacherEmailCheck, Payout } = require('../models');
+const { planFor, economy, payoutCents } = require('../config/plans');
+const { normalizeSkills, unknownSkills, canonicalSkill, skillsInCategory } = require('../config/catalog');
 const { HttpError } = require('../utils/transaction');
 const { getStripe } = require('../services/stripeService');
 
@@ -26,7 +27,6 @@ const cleanList = (value, { max, length = 80 }) => {
   });
   return [...unique.values()].slice(0, max);
 };
-const cleanSkills = (value) => cleanList(value, { max: 25 });
 const cleanLanguages = (value) => cleanList(value, { max: 8, length: 40 });
 
 const validCoordinates = (coordinates) => Array.isArray(coordinates)
@@ -57,11 +57,17 @@ const privateProfile = (user) => {
   const profile = user.toObject ? user.toObject() : { ...user };
   const plan = planFor(user);
   const hasBilling = Boolean(profile.stripeCustomerId);
+  const hasPayoutAccount = Boolean(profile.stripeConnectId);
   delete profile.stripeCustomerId;
   delete profile.stripeSubscriptionId;
+  delete profile.stripeConnectId;
+  delete profile.earnedUsed;
+  delete profile.payoutsBlockedReason;
   return {
     ...profile,
     hasBilling,
+    hasPayoutAccount,
+    isTeacher: profile.teacherStatus === 'approved',
     effectivePlan: plan.id,
     availableCredits: Math.round(((profile.creditBalance || 0) - (profile.creditsHeld || 0)) * 100) / 100,
     limits: { maxActiveBookings: plan.maxActiveBookings, maxSessionMinutes: plan.maxSessionMinutes, serviceFeePct: plan.serviceFeePct }
@@ -69,14 +75,33 @@ const privateProfile = (user) => {
 };
 
 /** Community-facing view: no email, balances, billing, or exact coordinates. */
+const publicTeacher = (profile) => {
+  const teacher = profile.teacherProfile || {};
+  return {
+    teacherType: teacher.teacherType,
+    tier: teacher.tier || 'standard',
+    headline: teacher.headline || '',
+    organization: teacher.organization || '',
+    jobTitle: teacher.jobTitle || '',
+    yearsExperience: teacher.yearsExperience || 0,
+    hourlyRateCredits: teacher.hourlyRateCredits ?? 1,
+    institutionVerified: Boolean(teacher.institutionalEmailVerified),
+    verifiedAt: teacher.verifiedAt,
+    credentials: teacher.credentials || []
+  };
+};
+
 const publicProfile = (user) => {
   const profile = user.toObject ? user.toObject() : { ...user };
+  const isTeacher = profile.teacherStatus === 'approved';
   return {
     _id: profile._id,
     name: profile.name,
     profilePicture: profile.profilePicture,
     bio: profile.bio,
-    skillsOffered: profile.skillsOffered,
+    isTeacher,
+    teacher: isTeacher ? publicTeacher(profile) : null,
+    skillsOffered: isTeacher ? profile.skillsOffered : [],
     skillsWanted: profile.skillsWanted,
     languages: profile.languages || [],
     timezone: profile.timezone,
@@ -109,8 +134,22 @@ exports.updateCompleteProfile = async (req, res) => {
   if (slots.some((slot) => slot.start >= slot.end)) throw new HttpError(400, 'Availability end time must be after start time');
 
   const user = req.user;
-  if (req.body.skillsOffered !== undefined) user.skillsOffered = cleanSkills(req.body.skillsOffered);
-  if (req.body.skillsWanted !== undefined) user.skillsWanted = cleanSkills(req.body.skillsWanted);
+  if (req.body.skillsWanted !== undefined) {
+    const unknown = unknownSkills(req.body.skillsWanted);
+    if (unknown.length) throw new HttpError(400, `SkillSwap covers tech skills only. Not in our catalog: ${unknown.join(', ')}`);
+    user.skillsWanted = normalizeSkills(req.body.skillsWanted);
+  }
+  if (req.body.skillsOffered !== undefined) {
+    // What a member teaches is decided by verification, not by editing a profile.
+    const offered = normalizeSkills(req.body.skillsOffered);
+    if (user.teacherStatus === 'approved') {
+      if (offered.some((skill) => !user.verifiedSkills.includes(skill))) throw new HttpError(403, 'You can only list skills an administrator has verified for you');
+      if (!offered.length) throw new HttpError(400, 'List at least one skill you teach, or ask support to pause your teacher profile');
+      user.skillsOffered = offered;
+    } else if (offered.length || (Array.isArray(req.body.skillsOffered) && req.body.skillsOffered.length)) {
+      throw new HttpError(403, 'Only verified teachers can list skills they teach. Apply on the Teach page.');
+    }
+  }
   if (req.body.languages !== undefined) user.languages = cleanLanguages(req.body.languages);
   if (typeof bio === 'string') user.bio = bio.trim().slice(0, 500);
   if (timezone !== undefined) user.timezone = validTimezone(timezone) ? timezone : 'UTC';
@@ -152,9 +191,29 @@ exports.clearLocation = async (req, res) => {
   res.json({ location: null });
 };
 
+const SORTS = ['recommended', 'rating', 'price_asc', 'price_desc'];
+const TEACHER_TYPE_VALUES = ['university_lecturer', 'industry_professional', 'certified_trainer', 'independent_expert'];
+
+const ratingStages = [
+  { $lookup: {
+    from: 'reviews',
+    let: { id: '$_id' },
+    pipeline: [
+      { $match: { $expr: { $eq: ['$reviewee', '$$id'] } } },
+      { $group: { _id: null, average: { $avg: '$rating' }, count: { $sum: 1 } } }
+    ],
+    as: 'ratingSummary'
+  } },
+  { $addFields: {
+    averageRating: { $round: [{ $ifNull: [{ $first: '$ratingSummary.average' }, 0] }, 1] },
+    reviewCount: { $ifNull: [{ $first: '$ratingSummary.count' }, 0] }
+  } }
+];
+
 /**
- * Member directory. Optional `q` searches names and skills; with coordinates
- * and a radius it returns nearby members ordered by Pro placement, then distance.
+ * Teacher directory: verified teachers only. Filters by free text, category, skill, qualification and
+ * maximum hourly rate; with coordinates and a radius it returns nearby teachers. Pro placement first
+ * unless another sort is chosen.
  */
 exports.getAllUsers = async (req, res) => {
   const limit = Math.min(Math.max(Number(req.query.limit) || 24, 1), 60);
@@ -165,18 +224,37 @@ exports.getAllUsers = async (req, res) => {
   const lat = Number(req.query.lat);
   const hasCoordinates = req.query.lng !== undefined && req.query.lat !== undefined && validCoordinates([lng, lat]);
   const useGeo = hasCoordinates && radiusKm !== 'worldwide';
+  const sort = SORTS.includes(req.query.sort) ? req.query.sort : 'recommended';
+  const skill = canonicalSkill(req.query.skill);
+  const categorySkills = skillsInCategory(String(req.query.category || ''));
+  const teacherType = TEACHER_TYPE_VALUES.includes(req.query.type) ? req.query.type : null;
+  const maxRate = Number(req.query.maxRate);
 
   const match = {
     _id: { $ne: new mongoose.Types.ObjectId(req.userId) },
     status: { $ne: 'suspended' },
+    teacherStatus: 'approved',
     'skillsOffered.0': { $exists: true }
   };
   if (q) {
     const pattern = new RegExp(escapeRegex(q), 'i');
-    match.$or = [{ name: pattern }, { skillsOffered: pattern }, { skillsWanted: pattern }];
+    match.$or = [{ name: pattern }, { skillsOffered: pattern }, { 'teacherProfile.headline': pattern }, { 'teacherProfile.organization': pattern }];
   }
+  if (skill) match.skillsOffered = skill;
+  else if (categorySkills.length) match.skillsOffered = { $in: categorySkills };
+  if (teacherType) match['teacherProfile.teacherType'] = teacherType;
+  if (Number.isFinite(maxRate) && maxRate > 0) match['teacherProfile.hourlyRateCredits'] = { $lte: maxRate };
 
   const isPro = { $cond: [{ $and: [{ $eq: ['$plan', 'pro'] }, { $in: [{ $ifNull: ['$planStatus', 'active'] }, PRO_STATUSES] }] }, true, false] };
+  const proximity = useGeo ? { distanceMeters: 1 } : { createdAt: -1 };
+  const order = {
+    recommended: { isPro: -1, ...proximity, _id: 1 },
+    price_asc: { 'teacherProfile.hourlyRateCredits': 1, isPro: -1, _id: 1 },
+    price_desc: { 'teacherProfile.hourlyRateCredits': -1, isPro: -1, _id: 1 },
+    rating: { averageRating: -1, reviewCount: -1, isPro: -1, _id: 1 }
+  }[sort];
+  const ratedFirst = sort === 'rating';
+
   const pipeline = [];
   if (useGeo) {
     pipeline.push({ $geoNear: {
@@ -190,27 +268,23 @@ exports.getAllUsers = async (req, res) => {
     pipeline.push({ $match: match });
   }
   pipeline.push(
-    { $addFields: { isPro: isPro } },
+    { $addFields: { isPro } },
+    ...(ratedFirst ? ratingStages : []),
     { $facet: {
       items: [
-        { $sort: useGeo ? { isPro: -1, distanceMeters: 1, _id: 1 } : { isPro: -1, createdAt: -1, _id: 1 } },
+        { $sort: order },
         { $skip: (page - 1) * limit },
         { $limit: limit },
-        { $lookup: {
-          from: 'reviews',
-          let: { id: '$_id' },
-          pipeline: [
-            { $match: { $expr: { $eq: ['$reviewee', '$$id'] } } },
-            { $group: { _id: null, average: { $avg: '$rating' }, count: { $sum: 1 } } }
-          ],
-          as: 'ratingSummary'
-        } },
+        ...(ratedFirst ? [] : ratingStages),
         { $project: {
-          name: 1, bio: 1, profilePicture: 1, skillsOffered: 1, skillsWanted: 1, languages: 1, timezone: 1, isPro: 1, createdAt: 1,
+          name: 1, bio: 1, profilePicture: 1, skillsOffered: 1, languages: 1, timezone: 1, isPro: 1, createdAt: 1,
           'location.city': 1, 'location.country': 1,
+          'teacherProfile.headline': 1, 'teacherProfile.teacherType': 1, 'teacherProfile.tier': 1, 'teacherProfile.organization': 1,
+          'teacherProfile.jobTitle': 1, 'teacherProfile.yearsExperience': 1, 'teacherProfile.hourlyRateCredits': 1,
+          institutionVerified: { $ifNull: ['$teacherProfile.institutionalEmailVerified', false] },
           distanceKm: useGeo ? { $round: [{ $divide: ['$distanceMeters', 1000] }, 1] } : '$$REMOVE',
-          averageRating: { $round: [{ $ifNull: [{ $first: '$ratingSummary.average' }, 0] }, 1] },
-          reviewCount: { $ifNull: [{ $first: '$ratingSummary.count' }, 0] }
+          averageRating: 1,
+          reviewCount: 1
         } }
       ],
       total: [{ $count: 'count' }]
@@ -224,14 +298,16 @@ exports.getAllUsers = async (req, res) => {
 /** GDPR-style export of everything the platform holds about the signed-in member. */
 exports.exportData = async (req, res) => {
   const id = req.user._id;
-  const [bookings, transactions, messages, reviews] = await Promise.all([
+  const [bookings, transactions, messages, reviews, teacherApplication, payouts] = await Promise.all([
     Booking.find({ $or: [{ requester: id }, { provider: id }] }).select('-roomId').lean(),
     Transaction.find({ $or: [{ from: id }, { to: id }] }).lean(),
     Message.find({ $or: [{ sender: id }, { recipient: id }] }).lean(),
-    Review.find({ $or: [{ reviewer: id }, { reviewee: id }] }).lean()
+    Review.find({ $or: [{ reviewer: id }, { reviewee: id }] }).lean(),
+    TeacherApplication.findOne({ user: id }).select('-reviewNotes').lean(),
+    Payout.find({ user: id }).lean()
   ]);
   res.set('Content-Disposition', 'attachment; filename="skillswap-data.json"').json({
-    exportedAt: new Date().toISOString(), profile: privateProfile(req.user), bookings, transactions, messages, reviews
+    exportedAt: new Date().toISOString(), profile: privateProfile(req.user), bookings, transactions, messages, reviews, teacherApplication, payouts
   });
 };
 
@@ -243,21 +319,33 @@ exports.deleteAccount = async (req, res) => {
   const user = req.user;
   const obligations = await Booking.countDocuments({ status: 'accepted', $or: [{ requester: user._id }, { provider: user._id }] });
   if (obligations > 0) throw new HttpError(409, 'Cancel or complete your upcoming sessions before deleting your account');
+  // Earnings that could be withdrawn are real money: never silently destroy them.
+  const inFlight = await Payout.countDocuments({ user: user._id, status: { $in: ['pending_review', 'processing'] } });
+  if (inFlight > 0) throw new HttpError(409, 'A withdrawal is still being processed. Try again once it has been paid.');
+  if (payoutCents(user.earnedCredits || 0) >= economy().minPayoutCents) {
+    throw new HttpError(409, 'You still have earnings you can withdraw. Withdraw them from your wallet before deleting your account.', { code: 'EARNINGS_REMAIN' });
+  }
 
   const stripe = getStripe();
   if (stripe && user.stripeSubscriptionId) {
     await stripe.subscriptions.cancel(user.stripeSubscriptionId).catch((error) => console.warn('Subscription cancel on delete failed:', error.message));
   }
   await Booking.updateMany({ status: 'pending', $or: [{ requester: user._id }, { provider: user._id }] }, { status: 'cancelled', cancelledBy: user._id, cancelReason: 'Account deleted' });
-  await Promise.all([Message.deleteMany({ $or: [{ sender: user._id }, { recipient: user._id }] }), Notification.deleteMany({ userId: user._id })]);
+  await Promise.all([
+    Message.deleteMany({ $or: [{ sender: user._id }, { recipient: user._id }] }),
+    Notification.deleteMany({ userId: user._id }),
+    TeacherApplication.deleteOne({ user: user._id }),
+    TeacherEmailCheck.deleteMany({ user: user._id })
+  ]);
 
   const clerkId = user.clerkId;
   await User.collection.updateOne({ _id: user._id }, {
     $set: {
       name: 'Deleted member', email: `deleted-${user._id}-${crypto.randomBytes(4).toString('hex')}@deleted.invalid`, profilePicture: '', bio: '',
-      skillsOffered: [], skillsWanted: [], languages: [], availability: [], status: 'suspended', plan: 'free', planStatus: 'canceled', creditsHeld: 0
+      skillsOffered: [], skillsWanted: [], verifiedSkills: [], languages: [], availability: [], status: 'suspended', plan: 'free', planStatus: 'canceled', creditsHeld: 0,
+      teacherStatus: 'none', payoutsEnabled: false
     },
-    $unset: { clerkId: '', location: '', stripeSubscriptionId: '', stripeCustomerId: '' }
+    $unset: { clerkId: '', location: '', stripeSubscriptionId: '', stripeCustomerId: '', stripeConnectId: '', teacherProfile: '' }
   });
   if (clerkId) await clerkClient.users.deleteUser(clerkId).catch((error) => console.warn('Clerk user deletion failed:', error.message));
   res.json({ message: 'Your account has been deleted' });

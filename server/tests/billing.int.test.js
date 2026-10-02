@@ -6,8 +6,8 @@ process.env.CLERK_PUBLISHABLE_KEY = 'pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXY
 const request = require('supertest');
 const Stripe = require('stripe');
 const { startDb, stopDb, clearDb } = require('./helpers/db');
-const { makeUser } = require('./helpers/factories');
-const { User, Payment, Transaction } = require('../models');
+const { makeUser, makeTeacher } = require('./helpers/factories');
+const { User, Payment, Transaction, Notification } = require('../models');
 const { setStripeClient } = require('../services/stripeService');
 const app = require('../app');
 
@@ -31,9 +31,9 @@ const send = (event, { secret = process.env.STRIPE_WEBHOOK_SECRET, signature } =
   return request(app).post('/api/billing/webhook').set('Content-Type', 'application/json').set('Stripe-Signature', header).send(payload);
 };
 
-const packEvent = (user, id = 'cs_test_1', packId = 'pack_10') => ({
+const packEvent = (user, id = 'cs_test_1', packId = 'pack_15') => ({
   id: `evt_${id}`, type: 'checkout.session.completed',
-  data: { object: { id, object: 'checkout.session', payment_status: 'paid', amount_total: 2500, currency: 'usd', customer: 'cus_1', client_reference_id: String(user._id), metadata: { userId: String(user._id), kind: 'credit_pack', packId } } }
+  data: { object: { id, object: 'checkout.session', payment_status: 'paid', amount_total: 13500, currency: 'usd', customer: 'cus_1', client_reference_id: String(user._id), metadata: { userId: String(user._id), kind: 'credit_pack', packId } } }
 });
 
 describe('Stripe webhook', () => {
@@ -50,9 +50,11 @@ describe('Stripe webhook', () => {
     const user = await makeUser();
     const response = await send(packEvent(user));
     expect(response.status).toBe(200);
-    expect((await User.findById(user._id)).creditBalance).toBe(15);
-    expect(await Payment.findOne({ externalId: 'cs_test_1' })).toMatchObject({ kind: 'credit_pack', credits: 10, amountCents: 2500 });
-    expect(await Transaction.findOne({ to: user._id, type: 'purchase' })).toMatchObject({ amount: 10 });
+    expect((await User.findById(user._id)).creditBalance).toBe(20);
+    expect(await Payment.findOne({ externalId: 'cs_test_1' })).toMatchObject({ kind: 'credit_pack', credits: 15, amountCents: 13500 });
+    expect(await Transaction.findOne({ to: user._id, type: 'purchase' })).toMatchObject({ amount: 15 });
+    // Bought credits are spendable, but never withdrawable: only teaching earns cash-out eligible credit.
+    expect((await User.findById(user._id)).earnedCredits).toBe(0);
   });
 
   test('is idempotent: replayed deliveries never grant credits twice', async () => {
@@ -60,7 +62,7 @@ describe('Stripe webhook', () => {
     await send(packEvent(user));
     await send(packEvent(user));
     await Promise.all([send(packEvent(user)), send(packEvent(user))]);
-    expect((await User.findById(user._id)).creditBalance).toBe(15);
+    expect((await User.findById(user._id)).creditBalance).toBe(20);
     expect(await Payment.countDocuments()).toBe(1);
   });
 
@@ -77,20 +79,20 @@ describe('Stripe webhook', () => {
     const user = await makeUser({ stripeCustomerId: 'cus_pro' });
     const subscription = { id: 'sub_1', customer: 'cus_pro', status: 'active', cancel_at_period_end: false, current_period_end: Math.floor(Date.now() / 1000) + 2592000, metadata: { userId: String(user._id), interval: 'month' } };
     stripe.subscriptions.retrieve.mockResolvedValue(subscription);
-    const event = { id: 'evt_inv', type: 'invoice.paid', data: { object: { id: 'in_1', status: 'paid', customer: 'cus_pro', subscription: 'sub_1', amount_paid: 1200, currency: 'usd', hosted_invoice_url: 'https://invoice.stripe.com/x' } } };
+    const event = { id: 'evt_inv', type: 'invoice.paid', data: { object: { id: 'in_1', status: 'paid', customer: 'cus_pro', subscription: 'sub_1', amount_paid: 1900, currency: 'usd', hosted_invoice_url: 'https://invoice.stripe.com/x' } } };
 
     expect((await send(event)).status).toBe(200);
     await send(event); // replay
     const fresh = await User.findById(user._id);
-    expect(fresh).toMatchObject({ plan: 'pro', planStatus: 'active', planInterval: 'month', stripeSubscriptionId: 'sub_1', creditBalance: 9 });
+    expect(fresh).toMatchObject({ plan: 'pro', planStatus: 'active', planInterval: 'month', stripeSubscriptionId: 'sub_1', creditBalance: 6 });
     expect(await Payment.countDocuments({ kind: 'subscription' })).toBe(1);
   });
 
   test('yearly Pro grants twelve months of credits up front', async () => {
     const user = await makeUser({ stripeCustomerId: 'cus_year' });
     stripe.subscriptions.retrieve.mockResolvedValue({ id: 'sub_y', customer: 'cus_year', status: 'active', metadata: { userId: String(user._id), interval: 'year' } });
-    await send({ id: 'evt_y', type: 'invoice.paid', data: { object: { id: 'in_y', status: 'paid', customer: 'cus_year', subscription: 'sub_y', amount_paid: 11900, currency: 'usd' } } });
-    expect(await User.findById(user._id)).toMatchObject({ planInterval: 'year', creditBalance: 53 });
+    await send({ id: 'evt_y', type: 'invoice.paid', data: { object: { id: 'in_y', status: 'paid', customer: 'cus_year', subscription: 'sub_y', amount_paid: 19000, currency: 'usd' } } });
+    expect(await User.findById(user._id)).toMatchObject({ planInterval: 'year', creditBalance: 17 });
   });
 
   test('downgrades to Free when the subscription is deleted, keeping earned credits', async () => {
@@ -113,6 +115,44 @@ describe('Stripe webhook', () => {
   });
 });
 
+describe('Stripe Connect webhooks', () => {
+  const accountEvent = (account, id = 'evt_acct') => ({ id, type: 'account.updated', data: { object: account } });
+
+  test('remembers when a teacher\'s payout account becomes able to receive money', async () => {
+    const teacher = await makeTeacher({ stripeConnectId: 'acct_t1', payoutsEnabled: false });
+    expect((await send(accountEvent({ id: 'acct_t1', payouts_enabled: true }))).status).toBe(200);
+    expect((await User.findById(teacher._id)).payoutsEnabled).toBe(true);
+    expect(await Notification.countDocuments({ userId: teacher._id, type: 'payout' })).toBe(1);
+
+    await send(accountEvent({ id: 'acct_t1', payouts_enabled: true }, 'evt_again')); // no duplicate notification
+    expect(await Notification.countDocuments({ userId: teacher._id, type: 'payout' })).toBe(1);
+    await send(accountEvent({ id: 'acct_t1', payouts_enabled: false }, 'evt_off'));
+    expect((await User.findById(teacher._id)).payoutsEnabled).toBe(false);
+  });
+
+  test('accepts events signed with the separate Connect endpoint secret and rejects others', async () => {
+    process.env.STRIPE_CONNECT_WEBHOOK_SECRET = 'whsec_connect_secret';
+    try {
+      const teacher = await makeTeacher({ stripeConnectId: 'acct_t2' });
+      const ok = await send(accountEvent({ id: 'acct_t2', payouts_enabled: true }), { secret: 'whsec_connect_secret' });
+      expect(ok.status).toBe(200);
+      expect((await User.findById(teacher._id)).payoutsEnabled).toBe(true);
+      expect((await send(accountEvent({ id: 'acct_t2', payouts_enabled: false }), { secret: 'whsec_nope' })).status).toBe(400);
+    } finally {
+      delete process.env.STRIPE_CONNECT_WEBHOOK_SECRET;
+    }
+  });
+
+  test('a card dispute pauses the member\'s withdrawals and alerts the admins', async () => {
+    const [member, admin] = [await makeTeacher({ stripeCustomerId: 'cus_disputer' }), await makeUser({ role: 'admin' })];
+    stripe.charges = { retrieve: jest.fn().mockResolvedValue({ id: 'ch_1', customer: 'cus_disputer' }) };
+    const response = await send({ id: 'evt_dp', type: 'charge.dispute.created', data: { object: { id: 'dp_1', charge: 'ch_1' } } });
+    expect(response.status).toBe(200);
+    expect(await User.findById(member._id)).toMatchObject({ payoutsBlocked: true, payoutsBlockedReason: expect.stringMatching(/dispute/) });
+    expect(await Notification.countDocuments({ userId: admin._id, type: 'billing' })).toBe(1);
+  });
+});
+
 describe('billing endpoints', () => {
   test('the catalog is public and describes plans, packs and billing availability', async () => {
     const response = await request(app).get('/api/billing/catalog');
@@ -120,10 +160,13 @@ describe('billing endpoints', () => {
     expect(response.body.plans.map((plan) => plan.id)).toEqual(['free', 'pro']);
     expect(response.body.packs).toHaveLength(3);
     expect(response.body.billingEnabled).toBe(true);
+    expect(response.body.signupCredits).toBe(5);
+    expect(response.body.economy).toMatchObject({ payoutCentsPerCredit: 800, minPayoutCents: 2000, payoutHoldDays: 3 });
+    expect(response.body.teacherRates.caps).toEqual({ standard: 3, expert: 8 });
   });
 
   test('checkout requires authentication', async () => {
-    const response = await request(app).post('/api/billing/checkout').send({ type: 'pack', packId: 'pack_3' });
+    const response = await request(app).post('/api/billing/checkout').send({ type: 'pack', packId: 'pack_5' });
     expect(response.status).toBe(401);
   });
 });

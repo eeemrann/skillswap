@@ -15,6 +15,7 @@ const bookingSchema = new mongoose.Schema({
   proposedTime: { type: Date, required: true },
   durationMinutes: { type: Number, min: 15, max: 480, default: 60 },
   credits: { type: Number, min: 0 }, // price of the session; legacy bookings have none (treated as 1)
+  rateCredits: { type: Number, min: 0 }, // the teacher's hourly rate when it was booked
   idempotencyKey: { type: String, maxlength: 100 },
   status: {
     type: String,

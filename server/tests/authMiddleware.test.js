@@ -90,8 +90,8 @@ describe('auth middleware', () => {
     await authMiddleware(req, res, next);
 
     const update = User.findOneAndUpdate.mock.calls[0][1];
-    expect(update.$setOnInsert).toMatchObject({ email: 'test@example.com', name: 'Test User', creditBalance: 3 });
-    expect(Transaction.create).toHaveBeenCalledWith(expect.objectContaining({ type: 'signup_bonus', to: 'user-new', amount: 3 }));
+    expect(update.$setOnInsert).toMatchObject({ email: 'test@example.com', name: 'Test User', creditBalance: 5 });
+    expect(Transaction.create).toHaveBeenCalledWith(expect.objectContaining({ type: 'signup_bonus', to: 'user-new', amount: 5 }));
     expect(next).toHaveBeenCalledTimes(1);
   });
 

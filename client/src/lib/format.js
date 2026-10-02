@@ -53,12 +53,6 @@ export const locationLabel = (location) => [location?.city, location?.country].f
 
 export const errorMessage = (error, fallback = 'Something went wrong. Please try again.') => error?.response?.data?.message || fallback;
 
-export const SKILL_SUGGESTIONS = [
-  'Spanish', 'French', 'English conversation', 'Japanese', 'Guitar', 'Piano', 'Singing', 'Photography', 'Video editing',
-  'Figma', 'UX design', 'Illustration', 'React', 'JavaScript', 'Python', 'Data analysis', 'Excel', 'SQL', 'Public speaking',
-  'Resume review', 'Product management', 'SEO', 'Copywriting', 'Cooking', 'Baking', 'Yoga', 'Chess', 'Personal finance'
-];
-
 export const WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 export const capitalize = (value = '') => value.charAt(0).toUpperCase() + value.slice(1);
 

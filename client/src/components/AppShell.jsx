@@ -14,6 +14,7 @@ const LINKS = [
   { to: '/browse', label: 'Discover', icon: 'search' },
   { to: '/bookings', label: 'Sessions', icon: 'video', badge: ['booking', 'session'] },
   { to: '/messages', label: 'Messages', icon: 'message', badge: ['message'] },
+  { to: '/teach', label: 'Teach & earn', icon: 'bolt', teacher: true },
   { to: '/billing', label: 'Wallet & plan', icon: 'wallet' },
   { to: '/settings', label: 'Profile', icon: 'user' }
 ];
@@ -31,13 +32,15 @@ function AppShell({ children, eyebrow, title, description, action, wide = false 
   const links = user?.role === 'admin' ? [...LINKS, { to: '/admin', label: 'Admin', icon: 'shield' }] : LINKS;
   const badgeFor = (item) => (item.badge || []).reduce((sum, type) => sum + (counts[type] || 0), 0);
   const isPro = user?.effectivePlan === 'pro';
+  const teacherStatus = user?.teacherStatus || 'none';
 
   const renderNav = (items, onNavigate) => items.map((item) => {
     const count = badgeFor(item);
     return (
       <NavLink key={item.to} to={item.to} className="nav-link" onClick={onNavigate}>
         <Icon name={item.icon} />
-        <span className="grow">{item.label}</span>
+        <span className="grow">{item.teacher && teacherStatus === 'approved' ? 'My teaching' : item.label}</span>
+        {item.teacher && teacherStatus === 'pending' && <span className="badge warning">In review</span>}
         {count > 0 && <span className="count-badge" aria-label={`${count} unread`}>{count > 99 ? '99+' : count}</span>}
       </NavLink>
     );
@@ -51,11 +54,11 @@ function AppShell({ children, eyebrow, title, description, action, wide = false 
         <nav className="nav" aria-label="Workspace">{renderNav(links, () => setMenuOpen(false))}</nav>
         <div className="sidebar-foot">
           {isPro ? (
-            <div className="plan-card pro"><span className="badge pro"><Icon name="crown" size={12} /> Pro</span><p className="small">0% service fee and priority placement are active.</p></div>
+            <div className="plan-card pro"><span className="badge pro"><Icon name="crown" size={12} /> Pro</span><p className="small">{user?.limits?.serviceFeePct ?? 6}% platform fee and priority placement are active.</p></div>
           ) : (
             <Link to="/billing" className="plan-card" onClick={() => setMenuOpen(false)}>
               <strong><Icon name="crown" size={15} /> Go Pro</strong>
-              <p className="small">4 credits every month, no service fee, longer sessions.</p>
+              <p className="small">Half the platform fee, a bonus credit every month, longer sessions.</p>
               <span className="small bold">See plans <Icon name="arrow" size={13} /></span>
             </Link>
           )}
@@ -75,7 +78,7 @@ function AppShell({ children, eyebrow, title, description, action, wide = false 
           <button type="button" className="btn btn-ghost btn-icon only-mobile" onClick={() => setMenuOpen(true)} aria-label="Open menu"><Icon name="menu" /></button>
           <div className="only-mobile"><Logo to="/dashboard" compact /></div>
           <div className="grow" />
-          <Link to="/billing" className="credit-chip" title="Spendable credits · 1 credit = 1 hour"><span className="coin">C</span>{formatCredits(user?.availableCredits ?? user?.creditBalance ?? 0)} credits</Link>
+          <Link to="/billing" className="credit-chip" title="Spendable credits for live sessions"><span className="coin">C</span>{formatCredits(user?.availableCredits ?? user?.creditBalance ?? 0)} credits</Link>
           <ThemeToggle />
           <NotificationBell />
         </header>

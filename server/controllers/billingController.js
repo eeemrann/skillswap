@@ -39,7 +39,7 @@ exports.createCheckout = async (req, res) => {
       mode: 'payment',
       line_items: [{
         quantity: 1,
-        price_data: { currency: CURRENCY, unit_amount: pack.priceCents, product_data: { name: `SkillSwap ${pack.name} pack`, description: `${pack.credits} credits · ${pack.credits} hours of live sessions` } }
+        price_data: { currency: CURRENCY, unit_amount: pack.priceCents, product_data: { name: `SkillSwap ${pack.name} pack`, description: `${pack.credits} credits for live 1:1 sessions with verified tech experts` } }
       }],
       metadata: { userId: String(user._id), kind: 'credit_pack', packId: pack.id }
     });
@@ -57,7 +57,7 @@ exports.createCheckout = async (req, res) => {
           currency: CURRENCY,
           unit_amount: interval === 'year' ? pro.priceYearlyCents : pro.priceMonthlyCents,
           recurring: { interval },
-          product_data: { name: 'SkillSwap Pro', description: `${pro.monthlyCredits} credits per month, 0% service fee, priority placement` }
+          product_data: { name: 'SkillSwap Pro', description: `${pro.monthlyCredits} credit per month, ${pro.serviceFeePct}% platform fee, priority placement` }
         }
       }],
       metadata,
@@ -85,13 +85,21 @@ exports.getPayments = async (req, res) => {
 /** Stripe webhook. Mounted with a raw body parser so the signature can be verified. */
 exports.webhook = async (req, res) => {
   const stripe = getStripe();
-  const secret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!stripe || !secret) return billingDisabled(res);
+  // Events about teachers' Connect accounts arrive on a second endpoint with its own signing secret.
+  const secrets = [process.env.STRIPE_WEBHOOK_SECRET, process.env.STRIPE_CONNECT_WEBHOOK_SECRET].filter(Boolean);
+  if (!stripe || !secrets.length) return billingDisabled(res);
   let event;
-  try {
-    event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], secret);
-  } catch (error) {
-    console.warn('Stripe webhook signature verification failed:', error.message);
+  let lastError;
+  for (const secret of secrets) {
+    try {
+      event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], secret);
+      break;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  if (!event) {
+    console.warn('Stripe webhook signature verification failed:', lastError?.message);
     return res.status(400).json({ message: 'Invalid signature' });
   }
   try {

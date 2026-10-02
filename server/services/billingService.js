@@ -128,6 +128,34 @@ async function handlePaymentFailed(invoice) {
   }
 }
 
+/** A teacher finished (or changed) their Stripe Connect onboarding: remember whether they can receive money. */
+async function handleAccountUpdated(account) {
+  const enabled = Boolean(account.payouts_enabled);
+  const user = await User.findOneAndUpdate({ stripeConnectId: account.id }, { payoutsEnabled: enabled }, { new: false });
+  if (user && enabled && !user.payoutsEnabled) {
+    await createInAppNotification({ userId: user._id, type: 'payout', message: 'Your payout account is ready. You can withdraw your earnings.', relatedId: user._id });
+  }
+  return user ? { updated: true } : { skipped: 'unknown-account' };
+}
+
+/**
+ * A card dispute on a credit purchase means money may be taken back after credits were spent.
+ * Hold the member's withdrawals until an administrator has looked at it.
+ */
+async function handleDispute(dispute) {
+  const stripe = getStripe();
+  const chargeId = typeof dispute.charge === 'string' ? dispute.charge : dispute.charge?.id;
+  if (!stripe || !chargeId) return { skipped: 'no-charge' };
+  const charge = await stripe.charges.retrieve(chargeId);
+  const customerId = typeof charge.customer === 'string' ? charge.customer : charge.customer?.id;
+  const user = customerId ? await User.findOne({ stripeCustomerId: customerId }) : null;
+  if (!user) return { skipped: 'unknown-customer' };
+  await User.updateOne({ _id: user._id }, { payoutsBlocked: true, payoutsBlockedReason: 'Withdrawals are paused while a payment dispute is reviewed.' });
+  const admins = await User.find({ role: 'admin', status: 'active' }).select('_id');
+  await Promise.all(admins.map((admin) => createInAppNotification({ userId: admin._id, type: 'billing', message: `Payment dispute opened by ${user.name}. Their withdrawals are on hold.`, relatedId: user._id })));
+  return { blocked: true };
+}
+
 /** Entry point for verified Stripe webhook events. Unhandled types are acknowledged and ignored. */
 async function processEvent(event) {
   const object = event.data?.object;
@@ -142,9 +170,13 @@ async function processEvent(event) {
     case 'customer.subscription.updated':
     case 'customer.subscription.deleted':
       return syncSubscription(object);
+    case 'account.updated':
+      return handleAccountUpdated(object);
+    case 'charge.dispute.created':
+      return handleDispute(object);
     default:
       return { skipped: event.type };
   }
 }
 
-module.exports = { processEvent, fulfilCreditPack, fulfilSubscriptionInvoice, syncSubscription, recordPaymentAndGrant };
+module.exports = { processEvent, fulfilCreditPack, fulfilSubscriptionInvoice, syncSubscription, recordPaymentAndGrant, handleAccountUpdated, handleDispute };

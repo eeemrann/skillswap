@@ -69,7 +69,7 @@ TEMPLATES = {
         lambda d: f"{d['actor']} could not take your {d['skill']} request",
         lambda d: "Request declined",
         lambda d: [f"{d['actor']} declined your {d['skill']} request. You have not been charged.",
-                   "Other members teach the same skill, so keep exploring."],
+                   "Other verified teachers cover the same skill, so keep exploring."],
         "Find another teacher",
     ),
     "BOOKING_CANCELLED": (
@@ -85,7 +85,7 @@ TEMPLATES = {
         lambda d: f"You earned credits for teaching {d['skill']}",
         lambda d: "Credits received",
         lambda d: [f"{d['actor']} confirmed your {d['skill']} session."]
-        + ([f"{credits_label(d['credits'])} were added to your wallet."] if d.get("credits") not in (None, "") else
+        + ([f"{credits_label(d['credits'])} were added to your wallet. You can spend them on lessons right away, and withdraw them as cash after a short clearing period."] if d.get("credits") not in (None, "") else
            ["Your credits have been transferred."]),
         "View wallet",
     ),
@@ -102,7 +102,7 @@ TEMPLATES = {
         lambda d: f"Receipt: {credits_label(d['credits'])} added to your wallet",
         lambda d: "Thanks for your purchase",
         lambda d: [f"We added {credits_label(d['credits'])} to your wallet. You paid {d['amount']}.",
-                   "Credits never expire. Spend them on any session."],
+                   "Credits never expire. Spend them on live sessions with any verified expert."],
         "Find a teacher",
     ),
     "SUBSCRIPTION_RECEIPT": (
@@ -111,6 +111,49 @@ TEMPLATES = {
         lambda d: "Your Pro payment succeeded",
         lambda d: [f"Your SkillSwap Pro payment of {d['amount']} went through.",
                    f"{credits_label(d['credits'])} were added to your wallet."],
+        "View wallet",
+    ),
+    "TEACHER_EMAIL_CODE": (
+        ("code",),
+        lambda d: f"{d['code']} is your SkillSwap verification code",
+        lambda d: "Verify your university or work email",
+        lambda d: [f"Your verification code is {d['code']}.",
+                   f"It expires in {d.get('minutes') or 15} minutes. Enter it on your teacher application to show our reviewers that this address is yours.",
+                   "If you did not ask for this code, you can ignore this email."],
+        "Open your application",
+    ),
+    "TEACHER_APPROVED": (
+        ("skills",),
+        lambda d: "You are now a verified SkillSwap teacher",
+        lambda d: "Your application was approved",
+        lambda d: [f"Congratulations{', ' + d['name'] if d.get('name') else ''}. We verified your credentials for: {d['skills']}.",
+                   (f"Your rate is {d['rate']} credits per hour. " if d.get("rate") else "") + "Learners can now find you in Discover and book live sessions.",
+                   "Add your weekly availability and set up payouts so you can cash out what you earn."],
+        "Open your profile",
+    ),
+    "TEACHER_REJECTED": (
+        ("reason",),
+        lambda d: "An update on your SkillSwap teacher application",
+        lambda d: "We need a little more from you",
+        lambda d: ["We could not approve your teacher application yet.",
+                   f"Note from the reviewer: {d['reason']}",
+                   "You can update your application and submit it again at any time."],
+        "Update your application",
+    ),
+    "PAYOUT_SENT": (
+        ("credits", "amount"),
+        lambda d: f"Your SkillSwap payout of {d['amount']} is on its way",
+        lambda d: "Payout sent",
+        lambda d: [f"We sent {d['amount']} for {credits_label(d['credits'])} to your connected bank account.",
+                   "Depending on your country and bank it usually arrives within a few business days. You can follow it in your Stripe dashboard."],
+        "View wallet",
+    ),
+    "PAYOUT_FAILED": (
+        ("credits", "reason"),
+        lambda d: "Your SkillSwap withdrawal was not completed",
+        lambda d: "Withdrawal not completed",
+        lambda d: [f"Your withdrawal of {credits_label(d['credits'])} could not be completed. {d['reason']}",
+                   "The credits are back in your wallet and nothing was paid out. You can request another withdrawal at any time."],
         "View wallet",
     ),
 }

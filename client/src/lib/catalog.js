@@ -4,21 +4,23 @@
  */
 export const FALLBACK_CATALOG = {
   currency: 'usd',
-  signupCredits: 3,
+  signupCredits: 5,
   billingEnabled: true,
+  economy: { creditValueCents: 1000, payoutCentsPerCredit: 800, minPayoutCents: 2000, payoutHoldDays: 3 },
+  teacherRates: { min: 0.5, step: 0.25, default: 1, caps: { standard: 3, expert: 8 } },
   plans: [
     {
-      id: 'free', name: 'Free', tagline: 'Everything you need to start swapping', priceMonthlyCents: 0, priceYearlyCents: 0, monthlyCredits: 0, serviceFeePct: 10, maxActiveBookings: 3, maxSessionMinutes: 60,
-      features: ['Live HD video sessions', 'Up to 3 active bookings', 'Sessions up to 60 minutes', 'In-session chat & screen sharing', '10% service fee on credits you earn']
+      id: 'free', name: 'Free', tagline: 'Learn from verified tech experts, pay per session', priceMonthlyCents: 0, priceYearlyCents: 0, monthlyCredits: 0, serviceFeePct: 12, maxActiveBookings: 3, maxSessionMinutes: 60,
+      features: ['Live HD video sessions with verified experts', 'Up to 3 active bookings', 'Sessions up to 60 minutes', 'In-session chat & screen sharing', '12% platform fee on teaching earnings']
     },
     {
-      id: 'pro', name: 'Pro', tagline: 'For people who learn and teach every week', priceMonthlyCents: 1200, priceYearlyCents: 11900, monthlyCredits: 4, serviceFeePct: 0, maxActiveBookings: 25, maxSessionMinutes: 240,
-      features: ['4 bonus credits every month', '0% service fee on credits you earn', 'Up to 25 active bookings', 'Sessions up to 4 hours', 'Priority placement in Discover + Pro badge', 'Priority support']
+      id: 'pro', name: 'Pro', tagline: 'For people who learn or teach every week', priceMonthlyCents: 1900, priceYearlyCents: 19000, monthlyCredits: 1, serviceFeePct: 6, maxActiveBookings: 25, maxSessionMinutes: 240,
+      features: ['1 bonus credit every month', 'Half the platform fee: 6% on teaching earnings', 'Up to 25 active bookings', 'Sessions up to 4 hours', 'Priority placement in Discover + Pro badge', 'Priority support']
     }
   ],
   packs: [
-    { id: 'pack_3', name: 'Starter', credits: 3, priceCents: 900 },
-    { id: 'pack_10', name: 'Learner', credits: 10, priceCents: 2500, popular: true },
-    { id: 'pack_25', name: 'Scholar', credits: 25, priceCents: 5500 }
+    { id: 'pack_5', name: 'Starter', credits: 5, priceCents: 5000 },
+    { id: 'pack_15', name: 'Builder', credits: 15, priceCents: 13500, popular: true },
+    { id: 'pack_40', name: 'Bootcamp', credits: 40, priceCents: 34000 }
   ]
 };

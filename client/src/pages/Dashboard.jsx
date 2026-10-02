@@ -49,10 +49,12 @@ export default function Dashboard() {
   const completed = list.filter((b) => b.status === 'completed').length;
   const next = upcoming[0];
 
+  const isTeacher = user?.teacherStatus === 'approved';
   const checklist = [
     { done: Boolean(user?.bio), label: 'Write a short introduction', to: '/settings' },
-    { done: Boolean(user?.skillsOffered?.length), label: 'List a skill you can teach', to: '/settings' },
-    { done: Boolean(user?.skillsWanted?.length), label: 'List a skill you want to learn', to: '/settings' },
+    isTeacher
+      ? { done: Boolean(user?.hasPayoutAccount), label: 'Set up payouts so you can cash out', to: '/billing' }
+      : { done: Boolean(user?.skillsWanted?.length), label: 'Pick the tech skills you want to learn', to: '/settings' },
     { done: Boolean(user?.availability?.length), label: 'Add your weekly availability', to: '/settings' },
     { done: Boolean(user?.location?.city), label: 'Add your city (optional)', to: '/settings' }
   ];
@@ -71,9 +73,11 @@ export default function Dashboard() {
         )}
 
         <div className="grid cols-4">
-          <Kpi label="Spendable credits" value={formatCredits(user?.availableCredits ?? user?.creditBalance ?? 0)} hint={held > 0 ? `${creditsLabel(held)} held for confirmed sessions` : '1 credit = 1 hour'} icon="wallet" tone="credit" />
+          <Kpi label="Spendable credits" value={formatCredits(user?.availableCredits ?? user?.creditBalance ?? 0)} hint={held > 0 ? `${creditsLabel(held)} held for confirmed sessions` : 'Use them on any verified teacher'} icon="wallet" tone="credit" />
           <Kpi label="Upcoming sessions" value={bookings.loading ? '–' : upcoming.length} hint={next ? `Next ${formatRelative(next.proposedTime, now)}` : 'Nothing scheduled'} icon="calendar" />
-          <Kpi label="Sessions completed" value={bookings.loading ? '–' : completed} hint="Taught and learned" icon="checkCircle" />
+          {isTeacher
+            ? <Kpi label="Earned from teaching" value={formatCredits(user?.earnedCredits || 0)} hint={user?.hasPayoutAccount ? 'Cash out from Wallet' : 'Set up payouts in Wallet'} icon="trending" />
+            : <Kpi label="Sessions completed" value={bookings.loading ? '–' : completed} hint="Lessons you have taken" icon="checkCircle" />}
           <Kpi label="Profile strength" value={`${strength}%`} hint={strength === 100 ? 'Looking great' : 'Complete it to get matched'} icon="user" />
         </div>
 
@@ -103,7 +107,7 @@ export default function Dashboard() {
             </section>
 
             <section className="card card-pad">
-              <div className="card-head"><div><h2 className="card-title">Recommended for you</h2><p className="small muted">People who teach what you want to learn</p></div><Link to="/browse" className="small">Browse all</Link></div>
+              <div className="card-head"><div><h2 className="card-title">Recommended for you</h2><p className="small muted">Verified teachers for the skills you want to learn</p></div><Link to="/browse" className="small">Browse all</Link></div>
               {matches.loading ? <div className="grid cols-2">{[1, 2, 3, 4].map((n) => <div key={n} className="skeleton" style={{ height: 88 }} />)}</div>
                 : matches.data?.length ? (
                   <div className="grid cols-2" style={{ '--gap': '12px' }}>
@@ -112,9 +116,10 @@ export default function Dashboard() {
                         <Avatar name={match.name} src={match.profilePicture} size="lg" />
                         <div className="grow stack" style={{ '--gap': '3px', minWidth: 0 }}>
                           <span className="row nowrap" style={{ gap: 6 }}><strong className="truncate">{match.name}</strong>{match.isPro && <span className="badge pro">Pro</span>}</span>
-                          <span className="small muted truncate">{match.matchedSkills.join(' · ')}</span>
+                          <span className="small muted truncate">{match.headline || match.matchedSkills.join(' · ')}</span>
                           <span className="row" style={{ gap: 6 }}>
-                            {match.mutualSkills?.length > 0 && <span className="badge success"><Icon name="swap" size={11} /> Mutual swap</span>}
+                            <span className="badge credit">{formatCredits(match.hourlyRateCredits ?? 1)} cr/h</span>
+                            {match.tier === 'expert' && <span className="badge success"><Icon name="checkCircle" size={11} /> Expert</span>}
                             {match.matchReasons.includes('Availability overlaps') && <span className="badge"><Icon name="clock" size={11} /> Schedules fit</span>}
                           </span>
                         </div>
@@ -122,7 +127,7 @@ export default function Dashboard() {
                     ))}
                   </div>
                 ) : (
-                  <EmptyState icon="spark" title="No matches yet" action={<Link className="btn btn-secondary" to="/settings">Add skills you want to learn</Link>}>List what you want to learn and we will find people who teach it.</EmptyState>
+                  <EmptyState icon="spark" title="No matches yet" action={<Link className="btn btn-secondary" to="/settings">Choose skills to learn</Link>}>Pick the tech skills you want to learn and we will find verified teachers for them.</EmptyState>
                 )}
             </section>
           </div>
@@ -141,10 +146,22 @@ export default function Dashboard() {
             {user?.effectivePlan !== 'pro' && (
               <section className="card card-pad upsell-card">
                 <span className="badge pro"><Icon name="crown" size={12} /> Pro</span>
-                <h3>Teach more, keep more</h3>
-                <p className="small">4 credits a month, no 10% service fee, and your profile shown first in Discover.</p>
+                <h3>Keep more of what you earn</h3>
+                <p className="small">Half the platform fee, a bonus credit every month, longer sessions, and your profile shown first in Discover.</p>
                 <Link className="btn btn-primary btn-sm" to="/billing">Compare plans</Link>
               </section>
+            )}
+
+            {!isTeacher && user?.teacherStatus !== 'pending' && (
+              <section className="card card-pad stack" style={{ '--gap': '10px' }}>
+                <span className="badge success"><Icon name="checkCircle" size={12} /> Teach &amp; earn</span>
+                <h3 className="card-title">Experienced in tech?</h3>
+                <p className="small muted">Lecturers, engineers and certified trainers can apply to teach live sessions and cash out their earnings.</p>
+                <Link className="btn btn-secondary btn-sm" to="/teach">Apply to teach</Link>
+              </section>
+            )}
+            {user?.teacherStatus === 'pending' && (
+              <Link to="/teach" className="alert warning action-alert"><Icon name="clock" /><span className="grow"><strong>Your teacher application is in review.</strong> We will email you with a decision.</span><Icon name="arrow" /></Link>
             )}
 
             <section className="card card-pad">

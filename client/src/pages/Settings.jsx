@@ -1,13 +1,15 @@
 import { useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useClerk } from '@clerk/clerk-react';
 import api from '../api/axios';
 import AppShell from '../components/AppShell';
 import Icon from '../components/Icon';
 import Modal from '../components/Modal';
+import SkillPicker from '../components/SkillPicker';
 import TagInput from '../components/TagInput';
-import { capitalize, errorMessage, SKILL_SUGGESTIONS, WEEKDAYS } from '../lib/format';
+import { capitalize, errorMessage, WEEKDAYS } from '../lib/format';
+import { TIER_LABEL } from '../lib/teachers';
 import { useToast } from '../lib/toast';
 import { logout, updateUser } from '../redux/authSlice';
 
@@ -26,7 +28,6 @@ const timezones = () => {
 const initialForm = (user) => ({
   bio: user?.bio || '',
   languages: user?.languages || [],
-  skillsOffered: user?.skillsOffered || [],
   skillsWanted: user?.skillsWanted || [],
   timezone: user?.timezone && user.timezone !== 'UTC' ? user.timezone : Intl.DateTimeFormat().resolvedOptions().timeZone,
   availability: user?.availability || [],
@@ -68,7 +69,7 @@ export default function Settings() {
     setSaving(true);
     try {
       const { data } = await api.put('/users/me', {
-        bio: form.bio, languages: form.languages, skillsOffered: form.skillsOffered, skillsWanted: form.skillsWanted,
+        bio: form.bio, languages: form.languages, skillsWanted: form.skillsWanted,
         timezone: form.timezone, availability: form.availability, location: { city: form.city, country: form.country }
       });
       dispatch(updateUser(data));
@@ -144,9 +145,30 @@ export default function Settings() {
           <TagInput label="Languages you speak" value={form.languages} onChange={set('languages')} placeholder="English, Spanish…" suggestions={LANGUAGES} max={8} maxLength={40} />
         </Section>
 
-        <Section title="Skills" description="Matching is based on these. Be specific: “conversational Spanish” beats “languages”.">
-          <TagInput label="I can teach" value={form.skillsOffered} onChange={set('skillsOffered')} placeholder="Add a skill and press Enter" suggestions={SKILL_SUGGESTIONS} />
-          <TagInput label="I want to learn" value={form.skillsWanted} onChange={set('skillsWanted')} placeholder="Add a skill and press Enter" suggestions={SKILL_SUGGESTIONS} />
+        <Section title="What you want to learn" description="We recommend verified teachers based on these. Pick technology skills from our catalog.">
+          <SkillPicker label="Learning goals" value={form.skillsWanted} onChange={set('skillsWanted')} max={25} />
+        </Section>
+
+        <Section title="Teaching" description="Only verified teachers can be booked. Every teacher is checked by hand before they go live.">
+          {user?.teacherStatus === 'approved' ? (
+            <div className="row spread">
+              <div className="stack" style={{ '--gap': '4px' }}>
+                <span className="row" style={{ gap: 8 }}><span className="verified-badge"><Icon name="checkCircle" size={14} /> {TIER_LABEL[user.teacherProfile?.tier] || 'Verified'} teacher</span><strong>{user.teacherProfile?.hourlyRateCredits} credits / hour</strong></span>
+                <span className="small muted">Teaching {user.skillsOffered?.join(', ') || 'no skills listed'}.</span>
+              </div>
+              <Link className="btn btn-secondary btn-sm" to="/teach">Manage teaching</Link>
+            </div>
+          ) : (
+            <div className="row spread">
+              <p className="small muted" style={{ maxWidth: 520 }}>
+                {user?.teacherStatus === 'pending' ? 'Your teacher application is in review. We will email you when there is a decision.'
+                  : user?.teacherStatus === 'rejected' ? 'Your last application needs changes before it can be approved.'
+                    : user?.teacherStatus === 'revoked' ? 'Your teacher access was removed.'
+                      : 'Lecturer, engineer or certified trainer? Apply to teach live sessions and earn money.'}
+              </p>
+              <Link className="btn btn-primary btn-sm" to="/teach">{user?.teacherStatus === 'pending' ? 'View application' : 'Become a verified teacher'}</Link>
+            </div>
+          )}
         </Section>
 
         <Section title="Availability" description="When are you usually free for live sessions? Times are in your timezone and converted for everyone else.">
@@ -201,7 +223,7 @@ export default function Settings() {
         </div>
       </Section>
 
-      <Modal open={deleting} onClose={() => setDeleting(false)} title="Delete your account?" description="This permanently removes your profile, messages and notifications and cancels any subscription. Unused credits are lost. This cannot be undone.">
+      <Modal open={deleting} onClose={() => setDeleting(false)} title="Delete your account?" description="This permanently removes your profile, messages and notifications and cancels any subscription. Credits you bought or received are lost, so withdraw any earnings first. This cannot be undone.">
         <div className="stack" style={{ '--gap': '14px' }}>
           <div className="field"><label htmlFor="confirm-delete">Type DELETE to confirm</label><input id="confirm-delete" className="input" value={confirmText} onChange={(event) => setConfirmText(event.target.value)} autoComplete="off" /></div>
           <div className="row" style={{ justifyContent: 'flex-end' }}>

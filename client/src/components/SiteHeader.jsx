@@ -16,7 +16,8 @@ export default function SiteHeader() {
         <Logo />
         <nav className={`site-nav ${open ? 'open' : ''}`} aria-label="Primary">
           <a href="/#how" onClick={close}>How it works</a>
-          <a href="/#features" onClick={close}>Features</a>
+          <a href="/#trust" onClick={close}>Verified teachers</a>
+          <a href="/#teach" onClick={close}>Teach &amp; earn</a>
           <NavLink to="/pricing" onClick={close}>Pricing</NavLink>
           <a href="/#faq" onClick={close}>FAQ</a>
           <div className="site-nav-actions only-mobile-flex">

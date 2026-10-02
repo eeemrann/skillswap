@@ -5,6 +5,7 @@ import api from '../api/axios';
 import AppShell from '../components/AppShell';
 import EmptyState from '../components/EmptyState';
 import Icon from '../components/Icon';
+import PayoutPanel from '../components/PayoutPanel';
 import PricingTable from '../components/PricingTable';
 import { openBillingPortal } from '../lib/billing';
 import { creditsLabel, errorMessage, formatCredits, formatDate, formatMoney } from '../lib/format';
@@ -12,7 +13,7 @@ import { useQuery } from '../lib/hooks';
 import { useToast } from '../lib/toast';
 import { updateUser } from '../redux/authSlice';
 
-const TYPE_LABEL = { session: 'Session', purchase: 'Credit pack', subscription_grant: 'Pro credits', signup_bonus: 'Welcome bonus', adjustment: 'Adjustment' };
+const TYPE_LABEL = { session: 'Session', purchase: 'Credit pack', subscription_grant: 'Pro credits', signup_bonus: 'Welcome bonus', adjustment: 'Adjustment', payout: 'Withdrawal', payout_refund: 'Withdrawal returned' };
 
 function Stat({ label, value, hint, tone = '' }) {
   return (
@@ -60,7 +61,7 @@ export default function Billing() {
   const totals = useMemo(() => (ledger.data || []).reduce((sum, entry) => {
     if (entry.direction === 'in' && entry.type === 'session') sum.earned += entry.amount;
     if (entry.direction === 'out') sum.spent += entry.amount;
-    if (entry.direction === 'in' && entry.type !== 'session') sum.bought += entry.amount;
+    if (entry.direction === 'in' && !['session', 'payout_refund'].includes(entry.type)) sum.bought += entry.amount;
     return sum;
   }, { earned: 0, spent: 0, bought: 0 }), [ledger.data]);
 
@@ -70,16 +71,27 @@ export default function Billing() {
   };
 
   const renewal = user?.currentPeriodEnd ? formatDate(user.currentPeriodEnd) : null;
+  const earnsMoney = ['approved', 'revoked'].includes(user?.teacherStatus) || (user?.earnedCredits || 0) > 0;
 
   return (
-    <AppShell eyebrow="Wallet & plan" title="Credits, plan & billing" description="1 credit = 1 hour of live video time. Earn them by teaching, or top up any time.">
+    <AppShell eyebrow="Wallet & plan" title="Credits, earnings & billing" description="Credits pay for live lessons with verified tech experts. Buy them any time. Verified teachers earn them and cash out.">
       <div className="stack" style={{ '--gap': '28px' }}>
         <div className="grid cols-4">
           <Stat tone="credit" label="Spendable credits" value={formatCredits(user?.availableCredits ?? user?.creditBalance ?? 0)} hint={user?.creditsHeld > 0 ? `${creditsLabel(user.creditsHeld)} held for confirmed sessions` : 'Ready to spend'} />
-          <Stat label="Earned teaching" value={formatCredits(totals.earned)} hint="Last 50 entries" />
+          <Stat label={earnsMoney ? 'Earned, cash-out eligible' : 'Earned teaching'} value={formatCredits(earnsMoney ? user?.earnedCredits || 0 : totals.earned)} hint={earnsMoney ? 'Part of your spendable credits' : 'Last 50 entries'} />
           <Stat label="Spent learning" value={formatCredits(totals.spent)} hint="Last 50 entries" />
-          <Stat label="Bought & bonus" value={formatCredits(totals.bought)} hint="Packs, Pro and welcome credits" />
+          <Stat label="Bought & bonus" value={formatCredits(totals.bought)} hint="Packs, Pro and welcome credits (learning only)" />
         </div>
+
+        {earnsMoney ? <PayoutPanel /> : (
+          <section className="card card-pad plan-banner">
+            <div className="stack grow" style={{ '--gap': '6px' }}>
+              <h2 className="card-title">Turn your expertise into income</h2>
+              <p className="muted small">Lecturers, engineers and certified trainers can apply to teach. Verified teachers earn credits for every session and cash them out to their bank.</p>
+            </div>
+            <Link className="btn btn-primary" to="/teach"><Icon name="bolt" size={16} /> Become a verified teacher</Link>
+          </section>
+        )}
 
         <section className="card card-pad plan-banner">
           <div className="stack grow" style={{ '--gap': '6px' }}>
@@ -90,20 +102,20 @@ export default function Billing() {
             {isPro ? (
               <p className="muted small">
                 {user.planStatus === 'past_due' ? 'We could not charge your card. Update your payment method to keep Pro.' : user.cancelAtPeriodEnd ? `Your subscription ends on ${renewal}. You keep Pro until then.` : renewal ? `Renews on ${renewal}.` : 'Active.'}
-                {' '}0% service fee, up to {user.limits?.maxActiveBookings} active bookings, sessions up to {(user.limits?.maxSessionMinutes || 0) / 60} hours.
+                {' '}Reduced {user.limits?.serviceFeePct}% platform fee, up to {user.limits?.maxActiveBookings} active bookings, sessions up to {(user.limits?.maxSessionMinutes || 0) / 60} hours.
               </p>
-            ) : <p className="muted small">You keep {100 - (user?.limits?.serviceFeePct ?? 10)}% of credits you earn, with up to {user?.limits?.maxActiveBookings ?? 3} active bookings and {user?.limits?.maxSessionMinutes ?? 60}-minute sessions. Upgrade to lift every limit.</p>}
+            ) : <p className="muted small">Teachers keep {100 - (user?.limits?.serviceFeePct ?? 12)}% of what they earn, and you can have up to {user?.limits?.maxActiveBookings ?? 3} active bookings with {user?.limits?.maxSessionMinutes ?? 60}-minute sessions. Pro lowers the fee and lifts the limits.</p>}
           </div>
           {user?.hasBilling && <button type="button" className="btn btn-secondary" onClick={portal} disabled={portalBusy}>{portalBusy ? <span className="spinner" /> : <><Icon name="card" size={16} /> Manage billing</>}</button>}
         </section>
 
         <section className="stack" style={{ '--gap': '8px' }}>
-          <div className="stack" style={{ '--gap': '4px' }}><h2 style={{ fontSize: 22 }}>{isPro ? 'Top up credits' : 'Upgrade or top up'}</h2><p className="muted small">Secure checkout by Stripe. Credits never expire.</p></div>
+          <div className="stack" style={{ '--gap': '4px' }}><h2 style={{ fontSize: 22 }}>{isPro ? 'Buy credits' : 'Buy credits or upgrade'}</h2><p className="muted small">Secure checkout by Stripe in your local currency where available. Credits never expire.</p></div>
           <PricingTable currentPlan={user?.effectivePlan} showPlans={!isPro} />
         </section>
 
         <section className="card">
-          <header className="card-head" style={{ padding: '20px 22px 0' }}><div><h2 className="card-title">Credit history</h2><p className="small muted">Every credit that moved in or out of your wallet.</p></div></header>
+          <header className="card-head" style={{ padding: '20px 22px 0' }}><div><h2 className="card-title">Credit history</h2><p className="small muted">Every credit that moved in or out of your wallet, including withdrawals.</p></div></header>
           {ledger.loading ? <div className="skeleton" style={{ height: 180, margin: 22 }} /> : !ledger.data?.length ? (
             <EmptyState icon="wallet" title="No credit activity yet" action={<Link className="btn btn-secondary" to="/browse">Book a session</Link>}>Your first session or purchase will show up here.</EmptyState>
           ) : (
@@ -112,7 +124,7 @@ export default function Billing() {
               <tbody>{ledger.data.map((entry) => (
                 <tr key={entry._id}>
                   <td className="nowrap-cell">{formatDate(entry.createdAt)}</td>
-                  <td><span className="badge">{entry.type === 'session' ? (entry.direction === 'in' ? 'Taught' : 'Learned') : TYPE_LABEL[entry.type]}</span></td>
+                  <td><span className="badge">{entry.type === 'session' ? (entry.direction === 'in' ? 'Taught' : 'Learned') : TYPE_LABEL[entry.type] || entry.type}</span></td>
                   <td className="muted">{entry.type === 'session' ? `${entry.description}${entry.counterpart ? ` · ${entry.direction === 'in' ? 'from' : 'with'} ${entry.counterpart}` : ''}${entry.fee > 0 ? ` · ${formatCredits(entry.fee)} fee` : ''}` : entry.description}</td>
                   <td className={`num ${entry.direction === 'in' ? 'positive' : 'negative'}`}>{entry.direction === 'in' ? '+' : '−'}{formatCredits(entry.amount)}</td>
                 </tr>

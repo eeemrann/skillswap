@@ -1,9 +1,9 @@
 const { Booking, User, Transaction } = require('../models');
-const { planFor, serviceFee, creditsForDuration } = require('../config/plans');
+const { planFor, serviceFee, creditsForDuration, TEACHER_RATES } = require('../config/plans');
 const { appUrl } = require('../config');
 const { round2 } = require('../utils/money');
 const { runInTransaction, HttpError } = require('../utils/transaction');
-const { availableCredits, holdCredits, releaseCredits, loadUser, writeCredits } = require('./creditService');
+const { availableCredits, holdCredits, releaseCredits, loadUser, writeCredits, earnedPortionOfSpend } = require('./creditService');
 const { newRoomId, bothAttended } = require('./sessionService');
 const { queueEmail, createInAppNotification } = require('./notificationService');
 
@@ -49,6 +49,9 @@ async function acceptBooking(bookingId, providerId) {
       userIds: [booking.requester, booking.provider], start: booking.proposedTime, end: booking.endsAt, excludeId: booking._id, session
     });
     if (conflict) throw new HttpError(409, 'This time overlaps an existing booking');
+
+    const teacher = await User.findById(booking.provider).select('teacherStatus').session(session);
+    if (teacher?.teacherStatus !== 'approved') throw new HttpError(409, 'Your teacher verification is not active, so you cannot confirm sessions');
 
     const cost = bookingCredits(booking);
     await holdCredits(booking.requester, cost, session);
@@ -146,9 +149,17 @@ async function settleBooking(bookingId, { byUserId, auto = false } = {}) {
     const spendable = wasHeld ? round2(requester.creditBalance - (requester.creditsHeld - cost)) : availableCredits(requester);
     if (spendable < cost) throw new HttpError(402, 'Insufficient credits to complete this booking', { code: 'INSUFFICIENT_CREDITS' });
 
+    // The platform fee is taken from the teacher's side; what is left becomes earned (cash-out eligible) credit.
     const fee = serviceFee(cost, planFor(provider));
-    await writeCredits(requester, { balance: requester.creditBalance - cost, held: wasHeld ? (requester.creditsHeld || 0) - cost : requester.creditsHeld }, session);
-    await writeCredits(provider, { balance: (provider.creditBalance || 0) + cost - fee, held: provider.creditsHeld || 0 }, session);
+    const net = round2(cost - fee);
+    const fromEarned = earnedPortionOfSpend(requester, cost);
+    await writeCredits(requester, {
+      balance: requester.creditBalance - cost,
+      held: wasHeld ? (requester.creditsHeld || 0) - cost : requester.creditsHeld,
+      earned: (requester.earnedCredits || 0) - fromEarned,
+      earnedUsed: (requester.earnedUsed || 0) + fromEarned
+    }, session);
+    await writeCredits(provider, { balance: (provider.creditBalance || 0) + net, earned: (provider.earnedCredits || 0) + net }, session);
     await Transaction.create([{ type: 'session', from: requester._id, to: provider._id, amount: cost, fee, booking: booking._id, description: booking.skill }], { session });
 
     booking.status = 'completed';
@@ -175,6 +186,7 @@ async function requestBooking({ requesterId, providerId, skill, note, proposedTi
   if (!requester) throw new HttpError(404, 'Member not found');
   if (!provider) throw new HttpError(404, 'Provider not found');
   if (provider.status === 'suspended') throw new HttpError(403, 'This provider is unavailable');
+  if (provider.teacherStatus !== 'approved') throw new HttpError(403, 'Sessions can only be booked with verified teachers');
   if (!provider.skillsOffered.some((item) => item.toLowerCase() === skill.toLowerCase())) throw new HttpError(400, 'This provider does not offer that skill');
 
   const plan = planFor(requester);
@@ -186,7 +198,8 @@ async function requestBooking({ requesterId, providerId, skill, note, proposedTi
     throw new HttpError(402, `The ${plan.name} plan allows ${plan.maxActiveBookings} active bookings at once`, { code: 'PLAN_LIMIT', limit: 'maxActiveBookings' });
   }
 
-  const credits = creditsForDuration(durationMinutes);
+  const rate = provider.teacherProfile?.hourlyRateCredits ?? TEACHER_RATES.default;
+  const credits = creditsForDuration(durationMinutes, rate);
   const available = availableCredits(requester);
   if (available < credits) {
     throw new HttpError(402, `This session costs ${credits} credit${credits === 1 ? '' : 's'} and you have ${available} available`, { code: 'INSUFFICIENT_CREDITS', required: credits, available });
@@ -197,7 +210,7 @@ async function requestBooking({ requesterId, providerId, skill, note, proposedTi
     throw new HttpError(409, 'This time overlaps an existing booking');
   }
 
-  const booking = await Booking.create({ requester: requesterId, provider: providerId, skill, note, proposedTime, durationMinutes, credits, idempotencyKey });
+  const booking = await Booking.create({ requester: requesterId, provider: providerId, skill, note, proposedTime, durationMinutes, credits, rateCredits: rate, idempotencyKey });
   await Promise.all([
     createInAppNotification({ userId: provider._id, type: 'booking', message: `${requester.name} requested a ${skill} session`, relatedId: booking._id }),
     queueEmail('BOOKING_CREATED', provider.email, emailData(booking, requester.name, { timezone: provider.timezone, note }))

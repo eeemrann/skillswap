@@ -42,10 +42,10 @@ export default function PricingTable({ currentPlan = null, showPacks = true, sho
             <p className="muted small">{free.tagline}</p>
           </header>
           <p className="plan-price"><strong>{formatMoney(0)}</strong><span className="muted">forever</span></p>
-          <p className="small muted">Includes {creditsLabel(catalog.signupCredits)} to start.</p>
+          <p className="small muted">Includes {creditsLabel(catalog.signupCredits)} free when you join. No card needed.</p>
           <ul className="plan-features">{free.features.map((feature) => <li key={feature}><Icon name="check" size={16} />{feature}</li>)}</ul>
           {currentPlan === 'free' ? <span className="btn btn-secondary btn-block" aria-disabled="true">Your current plan</span>
-            : <Link className="btn btn-secondary btn-block" to={isSignedIn ? '/dashboard' : '/register'}>{isSignedIn ? 'Open app' : 'Start for free'}</Link>}
+            : <Link className="btn btn-secondary btn-block" to={isSignedIn ? '/dashboard' : '/register'}>{isSignedIn ? 'Open app' : 'Start with free credits'}</Link>}
         </article>
 
         <article className="plan card featured">
@@ -67,8 +67,8 @@ export default function PricingTable({ currentPlan = null, showPacks = true, sho
       {showPacks && (
         <section className="stack" style={{ '--gap': '16px' }}>
           <div className="stack" style={{ '--gap': '4px', textAlign: 'center' }}>
-            <h3 style={{ fontSize: 22 }}>Or just top up</h3>
-            <p className="muted">Credits never expire. 1 credit buys 1 hour with any teacher.</p>
+            <h3 style={{ fontSize: 22 }}>Buy credits</h3>
+            <p className="muted">Credits never expire. A session costs the hourly rate of the teacher, and most charge 1 to 3 credits per hour.</p>
           </div>
           <div className="grid cols-3">
             {catalog.packs.map((pack) => {

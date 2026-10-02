@@ -85,8 +85,8 @@ exports.getMatches = async (req, res) => {
   const me = req.user;
   if (!me.skillsWanted?.length) return res.json([]);
 
-  const others = await User.find({ _id: { $ne: me._id }, status: { $ne: 'suspended' }, skillsOffered: { $in: me.skillsWanted.map((skill) => new RegExp(`^${skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')) } })
-    .select('name profilePicture skillsOffered skillsWanted location availability timezone plan planStatus')
+  const others = await User.find({ _id: { $ne: me._id }, status: { $ne: 'suspended' }, teacherStatus: 'approved', skillsOffered: { $in: me.skillsWanted.map((skill) => new RegExp(`^${skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')) } })
+    .select('name profilePicture skillsOffered skillsWanted location availability timezone plan planStatus teacherProfile')
     .limit(500)
     .lean();
   if (!others.length) return res.json([]);
@@ -129,7 +129,11 @@ exports.getMatches = async (req, res) => {
       profilePicture: user?.profilePicture || '',
       city: user?.location?.city || '',
       skillsOffered: user?.skillsOffered || [],
-      isPro: user?.plan === 'pro'
+      isPro: user?.plan === 'pro',
+      headline: user?.teacherProfile?.headline || '',
+      hourlyRateCredits: user?.teacherProfile?.hourlyRateCredits ?? 1,
+      teacherType: user?.teacherProfile?.teacherType,
+      tier: user?.teacherProfile?.tier || 'standard'
     };
   }));
 };

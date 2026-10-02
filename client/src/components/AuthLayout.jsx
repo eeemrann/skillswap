@@ -4,8 +4,8 @@ import Logo from './Logo';
 
 const POINTS = [
   ['video', 'Live HD video sessions, right in your browser'],
-  ['swap', 'Teach for an hour, earn an hour to spend learning'],
-  ['shield', 'Credits are held in escrow until your session happens']
+  ['shield', 'Every teacher is a verified lecturer or professional'],
+  ['wallet', 'Credits are held in escrow until your session happens']
 ];
 
 function AuthLayout({ children, mode }) {
@@ -15,18 +15,18 @@ function AuthLayout({ children, mode }) {
       <section className="auth-story">
         <Logo className="on-dark" />
         <div className="stack" style={{ '--gap': '22px' }}>
-          <h2>Learn anything.<br /><span>Pay with what you know.</span></h2>
+          <h2>Learn tech from<br /><span>people who ship it.</span></h2>
           <ul className="stack" style={{ '--gap': '14px' }}>
             {POINTS.map(([icon, text]) => <li key={text} className="row nowrap"><span className="auth-point"><Icon name={icon} size={18} /></span>{text}</li>)}
           </ul>
         </div>
-        <p className="small">New members start with free credits, no card needed.</p>
+        <p className="small">New members start with 5 free credits, no card needed.</p>
       </section>
       <section className="auth-form">
         <div className="auth-form-inner">
           <header className="stack" style={{ '--gap': '6px' }}>
             <h1>{isLogin ? 'Welcome back' : 'Create your account'}</h1>
-            <p className="muted">{isLogin ? 'Sign in to continue to your sessions.' : 'Start swapping skills in under a minute.'}</p>
+            <p className="muted">{isLogin ? 'Sign in to continue to your sessions.' : 'Claim your free credits and book a verified expert.'}</p>
           </header>
           {children}
           <p className="small muted center">{isLogin ? 'New to SkillSwap?' : 'Already have an account?'} <Link to={isLogin ? '/register' : '/login'}>{isLogin ? 'Create an account' : 'Sign in'}</Link></p>

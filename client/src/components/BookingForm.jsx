@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import api from '../api/axios';
-import { capitalize, creditsLabel, errorMessage, fitsAvailability, formatCredits, formatDateTime, formatDuration, SESSION_DURATIONS, toLocalInput } from '../lib/format';
+import { creditsLabel, errorMessage, fitsAvailability, formatCredits, formatDateTime, formatDuration, SESSION_DURATIONS, toLocalInput } from '../lib/format';
 import { useToast } from '../lib/toast';
 import Icon from './Icon';
 
@@ -20,7 +20,9 @@ export default function BookingForm({ profile }) {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
 
-  const cost = duration / 60;
+  const rate = profile.teacher?.hourlyRateCredits ?? 1;
+  const priceOf = (minutes) => Math.round((minutes / 60) * rate * 100) / 100;
+  const cost = priceOf(duration);
   const available = user?.availableCredits ?? user?.creditBalance ?? 0;
   const maxMinutes = user?.limits?.maxSessionMinutes ?? 60;
   const startMs = time ? new Date(time).getTime() : null;
@@ -43,7 +45,7 @@ export default function BookingForm({ profile }) {
     }
   };
 
-  if (!skills.length) return <section className="card card-pad"><p className="muted">{profile.name.split(' ')[0]} has not listed a skill to teach yet.</p></section>;
+  if (!skills.length) return <section className="card card-pad"><p className="muted">{profile.name.split(' ')[0]} has no skills listed for booking right now.</p></section>;
 
   if (sent) {
     return (
@@ -58,7 +60,7 @@ export default function BookingForm({ profile }) {
 
   return (
     <form className="card card-pad stack booking-form" style={{ '--gap': '16px' }} onSubmit={submit}>
-      <div className="row spread"><h2 className="card-title">Book a live session</h2><span className="badge brand"><Icon name="video" size={12} /> Video</span></div>
+      <div className="row spread"><h2 className="card-title">Book a live session</h2><span className="badge credit"><span className="coin">C</span> {formatCredits(rate)}/hour</span></div>
 
       <div className="field">
         <label htmlFor="bk-skill">Skill</label>
@@ -80,7 +82,7 @@ export default function BookingForm({ profile }) {
       <div className="field">
         <label htmlFor="bk-duration">Length</label>
         <select id="bk-duration" className="select" value={duration} onChange={(event) => setDuration(Number(event.target.value))}>
-          {SESSION_DURATIONS.map((minutes) => <option key={minutes} value={minutes} disabled={minutes > maxMinutes}>{formatDuration(minutes)} · {creditsLabel(minutes / 60)}{minutes > maxMinutes ? ' (Pro)' : ''}</option>)}
+          {SESSION_DURATIONS.map((minutes) => <option key={minutes} value={minutes} disabled={minutes > maxMinutes}>{formatDuration(minutes)} · {creditsLabel(priceOf(minutes))}{minutes > maxMinutes ? ' (Pro)' : ''}</option>)}
         </select>
       </div>
 
@@ -90,15 +92,15 @@ export default function BookingForm({ profile }) {
       </div>
 
       <div className="cost-box">
-        <div className="row spread"><span className="muted">Session cost</span><strong>{creditsLabel(cost)}</strong></div>
+        <div className="row spread"><span className="muted">Session cost <span className="tiny faint">({formatCredits(rate)} {rate === 1 ? 'credit' : 'credits'}/hour)</span></span><strong>{creditsLabel(cost)}</strong></div>
         <div className="row spread small"><span className="muted">Your spendable balance</span><span className={short ? 'negative-text' : ''}>{formatCredits(available)} credits</span></div>
-        <p className="tiny faint">Credits are only held once the teacher confirms, and returned if the session does not happen.</p>
+        <p className="tiny faint">Credits are only held once the teacher confirms, and returned in full if the session does not happen.</p>
       </div>
 
       {error && <p className="alert error" role="alert">{error}</p>}
       <button type="submit" className="btn btn-primary btn-lg" disabled={sending || !valid}>{sending ? <span className="spinner" /> : short ? 'Top up & request' : 'Request session'}</button>
-      {short && <p className="tiny faint center">You need {formatCredits(cost - available)} more credit{cost - available === 1 ? '' : 's'}. Choose “Request session” to top up, or teach a session to earn them.</p>}
-      {profile.timezone && <p className="tiny faint center">{capitalize(profile.name.split(' ')[0])}’s timezone: {profile.timezone}</p>}
+      {short && <p className="tiny faint center">You need {formatCredits(cost - available)} more credit{cost - available === 1 ? '' : 's'}. Choose “Request session” to buy credits.</p>}
+      {profile.timezone && <p className="tiny faint center">Teacher timezone: {profile.timezone}</p>}
     </form>
   );
 }

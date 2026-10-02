@@ -27,6 +27,7 @@ const Session = lazy(() => import('./pages/Session'));
 const Messages = lazy(() => import('./pages/Messages'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Billing = lazy(() => import('./pages/Billing'));
+const TeachApply = lazy(() => import('./pages/TeachApply'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 
 function LoadingScreen({ label = 'Loading…' }) {
@@ -172,6 +173,7 @@ function AppRoutes() {
         <Route path="/messages" element={guard(<Messages />)} />
         <Route path="/settings" element={guard(<Settings />)} />
         <Route path="/billing" element={guard(<Billing />)} />
+        <Route path="/teach" element={guard(<TeachApply />)} />
         <Route path="/admin" element={guard(user?.role === 'admin' ? <AdminDashboard /> : <Navigate replace to="/dashboard" />)} />
         <Route path="/edit-skills" element={<Navigate replace to="/settings" />} />
         <Route path="/credits" element={<Navigate replace to="/billing" />} />

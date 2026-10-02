@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const { evaluateAccess, buildIceServers, bothAttended, sessionWindow } = require('../services/sessionService');
-const { planFor, creditsForDuration, serviceFee, PLANS, signupCredits } = require('../config/plans');
+const { planFor, creditsForDuration, serviceFee, PLANS, CREDIT_PACKS, signupCredits, economy, payoutCents, isValidRate } = require('../config/plans');
 const { toUtcIntervals, availabilityOverlaps, tzOffsetMinutes } = require('../utils/availability');
 const { round2 } = require('../utils/money');
 
@@ -104,15 +104,17 @@ describe('ICE servers', () => {
 });
 
 describe('plans and pricing', () => {
-  test('1 credit is 1 hour', () => {
-    expect([30, 60, 90, 120, 240].map(creditsForDuration)).toEqual([0.5, 1, 1.5, 2, 4]);
+  test('a session costs the hourly rate of the teacher for the booked length', () => {
+    expect([30, 60, 90, 120, 240].map((minutes) => creditsForDuration(minutes))).toEqual([0.5, 1, 1.5, 2, 4]);
+    expect([30, 60, 90, 120].map((minutes) => creditsForDuration(minutes, 2.5))).toEqual([1.25, 2.5, 3.75, 5]);
+    expect(creditsForDuration(90, 0.75)).toBe(1.13); // rounded to cents of a credit, never float noise
   });
 
-  test('service fee is 10% on Free and nothing on Pro, without float drift', () => {
-    expect(serviceFee(1, PLANS.free)).toBe(0.1);
-    expect(serviceFee(1.5, PLANS.free)).toBe(0.15);
-    expect(serviceFee(0.5, PLANS.free)).toBe(0.05);
-    expect(serviceFee(4, PLANS.pro)).toBe(0);
+  test('platform fee is 12% on Free and half of that on Pro, without float drift', () => {
+    expect(serviceFee(1, PLANS.free)).toBe(0.12);
+    expect(serviceFee(1.5, PLANS.free)).toBe(0.18);
+    expect(serviceFee(0.5, PLANS.free)).toBe(0.06);
+    expect(serviceFee(4, PLANS.pro)).toBe(0.24);
     expect(round2(0.1 + 0.2)).toBe(0.3);
   });
 
@@ -127,13 +129,37 @@ describe('plans and pricing', () => {
     expect(planFor(null).id).toBe('free');
   });
 
-  test('welcome credits are configurable and sane', () => {
-    expect(signupCredits()).toBe(3);
-    process.env.SIGNUP_CREDITS = '5';
+  test('every member starts with 5 free credits, configurable and sane', () => {
     expect(signupCredits()).toBe(5);
+    process.env.SIGNUP_CREDITS = '8';
+    expect(signupCredits()).toBe(8);
     process.env.SIGNUP_CREDITS = '-1';
-    expect(signupCredits()).toBe(3);
+    expect(signupCredits()).toBe(5);
     delete process.env.SIGNUP_CREDITS;
+  });
+
+  test('the platform keeps money on every pack, even when a teacher is paid out at full commission-free value', () => {
+    const { payoutCentsPerCredit } = economy();
+    CREDIT_PACKS.forEach((pack) => {
+      const priceOfOneCredit = pack.priceCents / pack.credits;
+      // A learner buys a credit, a Pro teacher (lowest fee) earns what is left of it and cashes it out.
+      const cashPaidToTeacher = payoutCentsPerCredit * (1 - PLANS.pro.serviceFeePct / 100);
+      expect(priceOfOneCredit).toBeGreaterThan(cashPaidToTeacher);
+    });
+    expect(CREDIT_PACKS.map((pack) => pack.priceCents / pack.credits)).toEqual([...CREDIT_PACKS.map((pack) => pack.priceCents / pack.credits)].sort((a, b) => b - a));
+  });
+
+  test('payout conversion rounds to whole cents and hourly rates stay on the allowed grid', () => {
+    expect(payoutCents(2.5)).toBe(2000);
+    expect(payoutCents(0.33)).toBe(264);
+    expect(isValidRate(1)).toBe(true);
+    expect(isValidRate(2.75)).toBe(true);
+    expect(isValidRate(2.8)).toBe(false);
+    expect(isValidRate(0.25)).toBe(false);
+    expect(isValidRate(4)).toBe(false); // above the standard cap of 3
+    expect(isValidRate(4, 'expert')).toBe(true);
+    expect(isValidRate(9, 'expert')).toBe(false);
+    expect(isValidRate('abc')).toBe(false);
   });
 
   test('Pro is genuinely better on every axis it advertises', () => {

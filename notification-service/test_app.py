@@ -67,7 +67,8 @@ class NotificationServiceTest(unittest.TestCase):
 
 class RenderingTest(unittest.TestCase):
     def test_every_template_renders_with_realistic_data(self):
-        data = {'actor': 'Sam', 'skill': 'Guitar', 'time': '2026-10-05T12:00:00Z', 'credits': 1.5, 'amount': '9.00 USD', 'url': 'https://x.test/a'}
+        data = {'actor': 'Sam', 'skill': 'React', 'time': '2026-10-05T12:00:00Z', 'credits': 1.5, 'amount': '9.00 USD', 'url': 'https://x.test/a',
+                'name': 'Jane', 'code': '482913', 'minutes': 15, 'skills': 'Go, System Design', 'rate': '2', 'reason': 'Please link your staff page.'}
         for event_type in TEMPLATES:
             subject, text, html = render(event_type, data)
             self.assertTrue(subject and text and html, event_type)
@@ -90,6 +91,35 @@ class RenderingTest(unittest.TestCase):
         self.assertEqual(format_time('2026-10-05T12:00:00Z', 'Asia/Dhaka'), 'Mon 05 Oct 2026, 18:00 (Asia/Dhaka)')
         self.assertEqual(format_time('2026-10-05T12:00:00Z', 'Not/AZone'), 'Mon 05 Oct 2026, 12:00 (UTC)')
         self.assertEqual(format_time('garbage', 'UTC'), 'garbage')
+
+    def test_teacher_verification_code_email_shows_the_code_and_expiry(self):
+        subject, text, html = render('TEACHER_EMAIL_CODE', {'code': '482913', 'minutes': 15})
+        self.assertIn('482913', subject)
+        self.assertIn('Your verification code is 482913', text)
+        self.assertIn('15 minutes', text)
+        self.assertNotIn('href=', html)  # a code email has no button to click
+
+    def test_teacher_decisions_carry_the_reviewer_note_escaped(self):
+        _, text, html = render('TEACHER_REJECTED', {'reason': '<b>Link</b> your staff page', 'url': 'https://x.test/teach'})
+        self.assertIn('Link', text)
+        self.assertNotIn('<b>', html)
+        self.assertIn('&lt;b&gt;Link&lt;/b&gt;', html)
+        subject, text, _ = render('TEACHER_APPROVED', {'name': 'Jane', 'skills': 'Go', 'rate': '2'})
+        self.assertIn('verified', subject)
+        self.assertIn('Congratulations, Jane', text)
+        self.assertIn('2 credits per hour', text)
+
+    def test_payout_emails_state_the_money_and_the_outcome(self):
+        _, text, _ = render('PAYOUT_SENT', {'credits': 4, 'amount': '32.00 USD'})
+        self.assertIn('32.00 USD for 4 credits', text)
+        _, text, _ = render('PAYOUT_FAILED', {'credits': 4, 'reason': 'Declined after review'})
+        self.assertIn('back in your wallet', text)
+        self.assertIn('Declined after review', text)
+
+    def test_missing_fields_are_reported_for_the_new_templates(self):
+        for event_type in ('TEACHER_EMAIL_CODE', 'TEACHER_APPROVED', 'TEACHER_REJECTED', 'PAYOUT_SENT', 'PAYOUT_FAILED'):
+            with self.assertRaises(KeyError):
+                render(event_type, {})
 
     def test_credit_labels_pluralise(self):
         self.assertEqual(credits_label(1), '1 credit')
