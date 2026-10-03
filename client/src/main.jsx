@@ -8,6 +8,7 @@ import './styles/base.css';
 import './styles/app.css';
 import './styles/marketing.css';
 import './styles/session.css';
+import './styles/responsive.css';
 
 applyTheme();
 
