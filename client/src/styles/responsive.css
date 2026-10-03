@@ -64,7 +64,16 @@ table { max-width: 100%; }
 /* ───────── Tablets (≤ 960) ───────── */
 @media (max-width: 960px) {
   .topbar { padding-top: calc(10px + var(--safe-top)); padding-left: calc(14px + var(--safe-left)); padding-right: calc(14px + var(--safe-right)); }
-  .sidebar { padding-top: calc(20px + var(--safe-top)); padding-bottom: calc(20px + var(--safe-bottom)); padding-left: calc(14px + var(--safe-left)); }
+  /* Drawer: pinned top and bottom of the *visible* area (not 100vh, which on iOS is taller than
+     the screen), scrolls when the menu is longer, and keeps its footer clear of the browser bar. */
+  .sidebar {
+    top: 0; bottom: 0; height: auto; max-height: 100%;
+    overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+    padding-top: calc(20px + var(--safe-top)); padding-left: calc(14px + var(--safe-left));
+    padding-bottom: calc(28px + var(--safe-bottom));
+  }
+  .sidebar-foot { padding-bottom: 36px; }
+  .sidebar-foot, .nav { flex-shrink: 0; }
   .page { padding-left: calc(var(--gutter) + var(--safe-left)); padding-right: calc(var(--gutter) + var(--safe-right)); padding-bottom: calc(96px + var(--safe-bottom)); }
   .tabbar { padding-left: calc(4px + var(--safe-left)); padding-right: calc(4px + var(--safe-right)); }
   .toasts { right: calc(16px + var(--safe-right)); bottom: calc(82px + var(--safe-bottom)); }
